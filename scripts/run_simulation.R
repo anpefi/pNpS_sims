@@ -63,7 +63,7 @@ sNS_neu <- rep(0,nNS_neu)
 sS <- rep(0,nS)
 loci <- c(sNS_pos,sNS_neg,sNS_neu, sS)
 names(loci) <- 1:length(loci)
-drvNames = names(loci[1:nNS_pos])
+drvNames = if (nNS_pos > 0) names(loci[1:nNS_pos]) else NULL
 
 # Setting the Fitness effect on the simulator
 fe <- allFitnessEffects(noIntGenes = loci, drvNames = drvNames )
