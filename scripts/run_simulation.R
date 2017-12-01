@@ -46,6 +46,7 @@ option_list = list(
                 help="Run with debugging options")
 )
 opt = parse_args(OptionParser(option_list=option_list))
+saveRDS(opt, file= paste0(opt$id,".opt.rds"), compress = FALSE)
 
 ### LOADING REQUIRED LIBRARIES ###
 suppressPackageStartupMessages(library(OncoSimulR))
@@ -79,5 +80,6 @@ pp <- oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = F, detectionSize 
                    initSize = initSize, finalTime = finalTime, keepEvery=keepEvery,
                    mutationPropGrowth = FALSE, mc.cores = mc.cores)
 
-saveRDS(pp,file = paste0(id,".pop.gz"), compress = "gzip")
+saveRDS(pp,file = paste0(id,".pop.rds"), compress = "gzip")
+
 detach(opt)

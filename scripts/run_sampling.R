@@ -4,31 +4,16 @@
 suppressPackageStartupMessages(require(optparse))
 option_list = list(
     make_option(c("-i", "--id"), action="store", default="run", type='character',
-                help="ID name for this run"),
-
-    make_option(c("-t", "--finalTime"), action="store", default=10000, type='integer',
-                help="Max time units to evolve the cell population"),
-
-    make_option(c("--keepEvery"), action="store", default=100, type='double',
-                help="#Time units to keep samples for further analysis"),
-
+                help="ID name for the sim to be read"),
 
     make_option(c("-d", "--det.limit"), action="store", default=1e-9, type='double',
-                help="Frequency threshold to detect a variant"),
-    # Number of loci. N/S ~ 2.76 following Mulholland et al 2017
-    make_option(c("--nNS_pos"), action="store", default=10, type='integer',
-                help="Number of Non-Synonymous mutations with positive effect (Drivers)"),
-    make_option(c("--nNS_neg"), action="store", default=10, type='integer',
-                help="Number of Non-Synonymous mutations with negative effect"),
-    make_option(c("--nNS_neu"), action="store", default=27580, type='integer',
-                help="Number of Non-Synonymous mutations with no effect"),
-    make_option(c("--nS"), action="store", default=10000, type='integer',
-                help="Number of Synonymous mutations"),
+                help="Frequency threshold to detect a variant")
 
-    make_option(c("--debug"), action="store_true", default=FALSE, type='logical',
-                help="Run with debugging options")
 )
-opt = parse_args(OptionParser(option_list=option_list))
+opt <- parse_args(OptionParser(option_list=option_list))
+opt_sim <- readRDS(file = paste0(opt$id,".opt.rds"))
+# In case they are argument shared, this call will update the simulation ones
+opt <- c( opt_sim[!is.element(names(opt_sim), names(opt))] , opt )
 
 ### LOADING REQUIRED LIBRARIES ###
 suppressPackageStartupMessages(library(OncoSimulR))
@@ -36,7 +21,7 @@ suppressPackageStartupMessages(library(tidyverse))
 
 ### LOADING SIMULATION DATA
 attach(opt)
-pp <- readRDS(file = paste0(id,".pop.gz"))
+pp <- readRDS(file = paste0(id,".pop.rds"))
 
 # Initalizing some variables
 nNS <- nNS_pos + nNS_neg + nNS_neu
@@ -80,5 +65,5 @@ NSsample <- function(x, det.limit=0.05, nNS, nS, finalTime, keepEvery){
 
 samples <- do.call(rbind, Map(NSsample, pp, det.limit=det.limit, nNS=nNS, nS=nS, finalTime=finalTime, keepEvery=keepEvery))
 
-saveRDS(as.tibble(samples), file=paste0(id,".samples.gz"))
+saveRDS(as.tibble(samples), file=paste0(id,".samples.",det.limit,".rds"), compress = FALSE)
 detach(opt)
