@@ -33,14 +33,14 @@ NSsample <- function(x, det.limit=0.05, nNS, nS, finalTime, keepEvery){
     if(is.null(x$TotalPopSize)) {
         return(rep(NA, length(x$geneNames)))
     }
-    tsamples <- seq(0, finalTime, keepEvery)
+    tsamples <- x$pops.by.time[,1]
     n <- length(tsamples)
     result <- tibble(t=tsamples,
                      TS=rep(0,n),
                      N=rep(NA,n),S=rep(NA,n), nDrivers=rep(0,n),
                      pN_pS=rep(NA,n))
     for (i in 1:n){
-        if (!is.element(x$pops.by.time[i,1], tsamples)) break
+        #if (!is.element(x$pops.by.time[i,1], tsamples)) break
 
         pop <- x$pops.by.time[i, -1]
 
