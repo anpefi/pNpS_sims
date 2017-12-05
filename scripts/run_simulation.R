@@ -78,7 +78,8 @@ if(seed>0) set.seed(seed)
 pp <- oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = F, detectionSize = detectionSize,
                    detectionDrivers = NA, detectionProb = NA, sampleEvery=sampleEvery,
                    initSize = initSize, finalTime = finalTime, keepEvery=keepEvery,
-                   mutationPropGrowth = FALSE, mc.cores = mc.cores)
+                   mutationPropGrowth = FALSE, mc.cores = mc.cores, max.wall.time = 600,
+                   errorHitWallTime=FALSE)
 
 saveRDS(pp,file = paste0(id,".pop.rds"), compress = "gzip")
 
