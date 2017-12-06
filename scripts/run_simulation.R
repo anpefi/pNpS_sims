@@ -38,6 +38,8 @@ option_list = list(
                 help="Selection coefficient of driver mutations"),
     make_option(c("--mutationPropGroth"), action="store_true", default=FALSE, type='logical',
                 help="Is the mutation rate proportional to the pop growth rate?"),
+    make_option(c("--onlyCancer"), action="store_true", default=FALSE, type='logical',
+                help="Repeat if cancer not reached"),
     make_option(c("-c","--mc.cores"), action="store", default=1, type='integer',
                 help="number of cores"),
     make_option(c("--seed"), action="store", default=0, type='integer',
@@ -75,7 +77,7 @@ RNGkind("Mersenne-Twister")
 if(seed>0) set.seed(seed)
 
 #Run
-pp <- oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = F, detectionSize = detectionSize,
+pp <- oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = onlyCancer, detectionSize = detectionSize,
                    detectionDrivers = NA, detectionProb = NA, sampleEvery=sampleEvery,
                    initSize = initSize, finalTime = finalTime, keepEvery=keepEvery,
                    mutationPropGrowth = FALSE, mc.cores = mc.cores, max.wall.time = 600,
