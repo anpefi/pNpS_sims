@@ -4,20 +4,24 @@
 \alias{extract_samples}
 \title{Extract samples from a oncoSimulIndiv object}
 \usage{
-extract_samples(x, det.limit = 0.05, nNS, nS, finalTime, keepEvery)
+extract_samples(x, opt)
 }
 \arguments{
 \item{x}{An oncoSimulIndiv object}
 
-\item{det.limit}{A numeric value for the frquency threshold of a detected mutation}
-
-\item{nNS}{Number of NS (Non-Synonymous) loci}
-
-\item{nS}{Number of NS (Synonymous) loci}
+\item{opt}{A list with the options of the simulations
+The needed elements are:
+det.limit
+nNS_pos
+nNS_neg
+nNS_neu
+nS
+sNS_pos
+sNS_neg}
 }
 \value{
 A tibble with different papameters for all the sampled times
 }
 \description{
-Extract samples from a oncoSimulIndiv object
+This function was adapted from OncoSimulR::get.mut.vec
 }
