@@ -52,7 +52,7 @@ extract_samples <- function(x, opt){
 
 
     for(d in opt$det.limit){
-      variants <- as.numeric(freqs >= d)
+      variants <- as.numeric(freqs > d)
       drivers <- sum(variants[1:opt$nNS_pos])
       deletereous <- sum(variants[1:opt$nNS_neg])
       N <-sum(variants[1:nNS])
