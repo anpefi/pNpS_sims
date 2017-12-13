@@ -1,0 +1,120 @@
+---
+title: "Neutral case"
+author: "Andres Perez-Figueroa"
+date: "11/30/2017"
+output:
+  html_document:
+    fig_height: 6
+    fig_width: 10
+    fig_caption: yes
+    highlight: tango
+    theme: readable
+---
+
+## Description of the model
+  
+| Parameter |  Value |
+| ---- | ---- |
+| N loci | 27600 |
+| S loci | 10000 |
+| mutation rate | 2.66e-09 |
+| sampling interval | 500 t.u. |
+| Final time | 50000 t.u. |
+| Initial size | 10000 cells |
+
+
+  
+## Results
+
+```{r, message=FALSE}
+library(tidyverse, quietly = T, warn.conflicts = FALSE)
+knitr::opts_knit$set(eval.after = "fig.cap")
+```
+
+
+
+```{r}
+samples <- readRDS(here::here("results","neu_McFL.data.rds"))
+samples$threshold <- as.factor(samples$threshold)
+levels(samples$threshold) <- c("All", "f > 0.001", "f > 0.01", "f > 0.05")
+```
+
+
+
+```{r}
+TS_summary <- samples  %>% filter(threshold=="All") %>% group_by(model,t) %>%  
+  summarise(
+    mean_TS=mean(TS, na.rm = T),
+    median_TS=median(TS, na.rm = T),
+    ) 
+
+pNpS_summary <- samples  %>% group_by(model,threshold, t) %>%  
+  summarise(
+    mean_pN_pS=mean(pN_pS, na.rm = T),
+    median_pN_pS=median(pN_pS, na.rm = T),
+    N=mean(N, na.rm = T),
+    S = mean(S, na.rm = TRUE)
+    )
+
+r <- samples %>% filter(t==0, threshold=="All") %>% count %>% as.numeric
+
+samples$rep <- rep(rep(1:r, each=dim(TS_summary)[1]),4)
+samples$t <- samples$t %>% floor
+
+```
+  
+  
+  
+```{r fig1, message=F, warning=F, fig.cap=caption}
+caption <- "Fig 1. Population size across time under the neutral case"
+ggplot(data = samples, mapping = aes(x=t, y=TS)) +
+    geom_point(aes(group=rep),color="grey", alpha=0.2, cex=0.1) +
+    geom_abline(slope = 0, intercept = 10000, lty="dashed", lwd=0.5) +
+    geom_line(data=TS_summary, mapping = aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
+    theme_classic(base_size = 18) + ylim(0,12000) + 
+    ylab("# Cells") 
+```
+  
+    
+    
+
+```{r fig2, message=F, warning=F, fig.cap=caption}
+caption <- "Fig 2. pN/pS replicates across time under the neutral case. Each line
+ represents the loess regression of the median for 1000 replicates by sampling
+ those variants with frequencies above the threshold"
+ggplot() +
+  geom_smooth(data = pNpS_summary, mapping = aes(x=t,y=median_pN_pS, color=threshold), se=F) +
+  geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
+  theme_classic(base_size = 18) + ylim(0,2) + ylab("pN/pS") +
+  theme(legend.position = "top", legend.text = element_text(size = 10)) +
+  theme(legend.title = element_text(size = 10) ) + labs(color="Frequency threshold:  ")
+```
+  
+  
+  
+  
+```{r fig3, message=F, warning=F, fig.cap=caption}
+caption <- "Fig 3. Distribution of pN/pS at different time points "
+ggplot(data=samples %>% filter(t %in% c(500,25000,50000)) ) +
+  geom_boxplot(mapping = aes(x=factor(t), y=pN_pS, fill=threshold), outlier.size = 0.2 ) +
+  geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
+  theme_classic(base_size = 18) + ylim(0,7.5) + ylab("pN/pS") + xlab("t") +
+  theme(legend.position = "top", legend.text = element_text(size = 10)) +
+  theme(legend.title = element_text(size = 10) ) + labs(fill="Frequency threshold:   ")
+```
+   
+    
+    
+
+```{r fig4, message=F, warning=F, fig.cap=caption}
+caption <- "Fig 4. Average number of detected variants across the time. Colors represent the proportion of N and S mutations"
+mutations <- pNpS_summary %>% gather(key = "Type", value = "Mean", factor_key = T, N,S)
+
+ggplot(mutations) + 
+  geom_area(aes(x=t,y=Mean, fill=factor(Type)), position = "stack") +
+  facet_wrap(~threshold, nrow = 2) +
+  theme_bw(base_size = 15) + ylim(0,15) + ylab("Average detected variants") + xlab("t") +
+  theme(legend.position = "top", legend.text = element_text(size = 10)) +
+  theme(legend.title = element_text(size = 10) ) + labs(fill="Mutation type:   ")
+```
+
