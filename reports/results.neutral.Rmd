@@ -4,9 +4,16 @@ author: "Andres Perez-Figueroa"
 date: "11/30/2017"
 output:
   html_document:
+    fig_caption: yes
     fig_height: 6
     fig_width: 10
+    highlight: tango
+    theme: readable
+  html_notebook:
+    code_folding: show
     fig_caption: yes
+    fig_height: 8
+    fig_width: 10
     highlight: tango
     theme: readable
 ---
@@ -45,7 +52,7 @@ levels(samples$threshold) <- c("All", "f > 0.001", "f > 0.01", "f > 0.05")
 TS_summary <- samples  %>% filter(threshold=="All") %>% group_by(model,t) %>%  
   summarise(
     mean_TS=mean(TS, na.rm = T),
-    median_TS=median(TS, na.rm = T),
+    median_TS=median(TS, na.rm = T)
     ) 
 
 pNpS_summary <- samples  %>% group_by(model,threshold, t) %>%  
@@ -58,7 +65,6 @@ pNpS_summary <- samples  %>% group_by(model,threshold, t) %>%
 
 r <- samples %>% filter(t==0, threshold=="All") %>% count %>% as.numeric
 
-samples$rep <- rep(rep(1:r, each=dim(TS_summary)[1]),4)
 samples$t <- samples$t %>% floor
 
 ```
