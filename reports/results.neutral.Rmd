@@ -1,7 +1,7 @@
 ---
-title: "Neutral case"
+title: "Neutral scenario"
 author: "Andres Perez-Figueroa"
-date: "11/30/2017"
+date: "2017-12-13"
 output:
   html_document:
     fig_caption: yes
@@ -9,38 +9,60 @@ output:
     fig_width: 10
     highlight: tango
     theme: readable
-  html_notebook:
-    code_folding: show
-    fig_caption: yes
-    fig_height: 8
-    fig_width: 10
-    highlight: tango
-    theme: readable
 ---
+
+This report documents the results of the run for the **neutral case** in the simulations using *OncoSimulR* (Díaz-Uriarte 2017). The objective of this scenario is to present a null case and test the simulator. Here, all mutations have not effect on the fitness (birth rate) of the carrying cells. Under this scenario we expect that net population growth would be 0 and that pN/pS would be around 1, at least when the system reaches some equilibrium. 
+
 
 ## Description of the model
   
+  *OncoSimulR* can use an use exponential growth model or a model with
+carrying capacity that follows McFarland et al. (2013). For the exponential growth
+model, the death rate is fixed at one whereas in the model with carrying capacity
+death rate increases with population size.
+
+### Exponential model
+  
+  The default model in *OncoSimulR*. The death rate is fixed to $d=1$ and the birth rate is $$b = \prod{(1 + s_i)}$$ being $s_i$ the selective coefficient for each mutation. Given that in this scenario $s_i = 0$ for all the loci then $b=1$. However, this does not mean that the population size remains constant over time. There is stochasticity in the birth-death process and when the initial population size is not very large and we start from the wild-type, it is not uncommon for simulations to become extinct (or growing too far).
+
+### McFarland (Logistic) model
+  
+  Following the model of McFarland et al. (2013), the effects of drivers (non-synonymous mutations with positive effect) contribute to the numerator of the birth rate, and those of the deleterious (NS mutations with negative effect) passengers to the denominator as:
+$$b = \frac{(1+s^+)^{n_{drivers}}}{(1-s^-)^{n_{deleterious}}}$$
+However, **in this scenario all the N (non-synonimous) mutations have no effect**, all the *s* are 0, and **then birth rate is fixed to 1**.
+  
+  For death rate, *oncoSimulR* uses the expression that McFarland et al. (2013) for large cancers (grown to $10^6$ cells)”: $$d = \log(1+N/K)$$
+where $N$ here is the current tumor size and $K$ is the initial equilibrium population size. As the authors explain, for large $N/K$ the above expression recapitulates Gompertzian dynamics observed experimentally for large tumors. Under the current neutral scenario, this means that population size would be buffered by the changes in the death rate.
+
+
+### Parameters
+  
 | Parameter |  Value |
 | ---- | ---- |
-| N loci | 27600 |
-| S loci | 10000 |
+| Total loci (sites) | 37600 |
+| .N loci | 27600 |
+| ..N loci (drivers)| 0 |
+| ..N loci (deleterious)| 0 |
+| ..N loci (neutral)| 27600 |
+| .S loci | 10000 |
 | mutation rate | 2.66e-09 |
 | sampling interval | 500 t.u. |
 | Final time | 50000 t.u. |
 | Initial size | 10000 cells |
+| replicates | 1000 |
 
-
+Table: Table 1. Parameter values used in this simulation
   
 ## Results
 
-```{r, message=FALSE}
+```{r global_optins, include=FALSE, message=FALSE}
 library(tidyverse, quietly = T, warn.conflicts = FALSE)
-knitr::opts_knit$set(eval.after = "fig.cap")
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning=FALSE, cache = TRUE)
 ```
 
 
 
-```{r}
+```{r read_data}
 samples <- readRDS(here::here("results","neu_McFL.data.rds"))
 samples$threshold <- as.factor(samples$threshold)
 levels(samples$threshold) <- c("All", "f > 0.001", "f > 0.01", "f > 0.05")
@@ -48,7 +70,7 @@ levels(samples$threshold) <- c("All", "f > 0.001", "f > 0.01", "f > 0.05")
 
 
 
-```{r}
+```{r summarize}
 TS_summary <- samples  %>% filter(threshold=="All") %>% group_by(model,t) %>%  
   summarise(
     mean_TS=mean(TS, na.rm = T),
@@ -69,25 +91,60 @@ samples$t <- samples$t %>% floor
 
 ```
   
+```{r exponential_model}
+expSamples <- readRDS(here::here("results","neu_Exp.samples.1e-09.rds"))
+expSamples$rep <- rep(1:100, each=101) #Only 100 replicates
+expMeans <- expSamples %>% group_by(t) %>%  summarise(mean_TS=mean(TS, na.rm = T) ) 
+```
   
   
-```{r fig1, message=F, warning=F, fig.cap=caption}
-caption <- "Fig 1. Population size across time under the neutral case"
+```{r captions}
+caption1 <- "Figure 1. Population size across time under the neutral scenario with
+ the MacFarland model. Gray points represent individual values for each of the 1000 replicates. Blue line shows the mean number of cells. Dashed black line shows 
+ the equilibrium size."
+caption2 <- "Figure 2. Population size across time under the neutral scenario with
+ the Exponential model. Gray lines represent different replicates (only 100). Blue line shows the mean number of cells in all replicates. Dashed black line shows the initial size."
+caption3 <- "Figure 3. pN/pS replicates across time under the neutral case. Each line
+ represents the loess regression of the median for 1000 replicates by sampling
+ those variants with frequencies above the threshold."
+caption4 <- "Figure 4. Distribution of pN/pS at different time points. "
+caption5 <- "Figure 5. Average number of detected variants across the time. Colors represent the proportion of N and S mutations."
+```
+
+### Evolution of the population size
+
+As expected, under the McFarland model the population size (number of cells) remains quite stable around the initial size of 10000 cells (**Figure 1**). This size is the equilibrium value and if the population size increases then the death rate also increases, and viceversa. This helped to keep the population size very stable within a very limited range of ~ 9500-10500 cells. 
+  
+```{r fig1, fig.cap=caption1}
+
 ggplot(data = samples, mapping = aes(x=t, y=TS)) +
     geom_point(aes(group=rep),color="grey", alpha=0.2, cex=0.1) +
     geom_abline(slope = 0, intercept = 10000, lty="dashed", lwd=0.5) +
     geom_line(data=TS_summary, mapping = aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
-    theme_classic(base_size = 18) + ylim(0,12000) + 
-    ylab("# Cells") 
+    theme_classic(base_size = 18) + ylim(9000,11000) + 
+    ylab("# Cells") + ggtitle("Population size", "McFarland model")
 ```
   
+ With **the exponential model**, however, the stochasticity was very high and several replicates went extinct and others grew up to one magnitude order (Figure 2). With this model, a neutral population could behave as "tumor" by growing unlimited. So, this model **seems not to be very useful for this scenario**. 
     
+       
     
+```{r fig2, fig.cap=caption2}
+ggplot(data = expSamples, mapping = aes(x=t, y=TS)) +
+    geom_line(aes(group=rep),color="black", alpha=0.8, cex=0.2) +
+    geom_abline(slope = 0, intercept = 10000, lty="dashed", lwd=0.5) +
+    geom_line(expMeans, mapping = aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
+    theme_classic(base_size = 18) + 
+    ylab("# Cells") + ggtitle("Population size", "Exponential model")
+```
+  
+### Evolution of the pN/pS
+  
+  When considering all the variants already present in the population, the pN/pS quickly tends to 1 (Figure 3). When we only measure those variants above a (detection) threshold, the pN/pS is usually below 1 during long time. This is particularly true for a threshold of 5%, the usual frequency fot a variant be detected by NGS.
+  
+  
 
-```{r fig2, message=F, warning=F, fig.cap=caption}
-caption <- "Fig 2. pN/pS replicates across time under the neutral case. Each line
- represents the loess regression of the median for 1000 replicates by sampling
- those variants with frequencies above the threshold"
+```{r fig3, fig.cap=caption3}
 ggplot() +
   geom_smooth(data = pNpS_summary, mapping = aes(x=t,y=median_pN_pS, color=threshold), se=F) +
   geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
@@ -96,11 +153,10 @@ ggplot() +
   theme(legend.title = element_text(size = 10) ) + labs(color="Frequency threshold:  ")
 ```
   
+  Figure 4 show the distribution of the pN/pS under the different sampling regimes in three time points. The biggest differences are very early in the evolution of the population but the distributions are getting closer after ¿long? time.
   
   
-  
-```{r fig3, message=F, warning=F, fig.cap=caption}
-caption <- "Fig 3. Distribution of pN/pS at different time points "
+```{r fig4, fig.cap=caption4}
 ggplot(data=samples %>% filter(t %in% c(500,25000,50000)) ) +
   geom_boxplot(mapping = aes(x=factor(t), y=pN_pS, fill=threshold), outlier.size = 0.2 ) +
   geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
@@ -109,13 +165,11 @@ ggplot(data=samples %>% filter(t %in% c(500,25000,50000)) ) +
   theme(legend.title = element_text(size = 10) ) + labs(fill="Frequency threshold:   ")
 ```
    
-    
+ Figure 5 shows the absolute number of mutations detected  under the different sampling regimes and their proportion into N and S. Here is the explanation for the differences in the distributions of pN/pS. The overall number of mutations detected is very low at early times, and for different sampling regimes are obviously lower. This produces some noise in the pN/pS as in early times there are replicates whitout N (pN/pS=0) or whitout S (pN/pS=NA). In this context, where there are on average ~12 mutations segregating in the population, the calculation of pN/pS is very noisy. 
     
 
-```{r fig4, message=F, warning=F, fig.cap=caption}
-caption <- "Fig 4. Average number of detected variants across the time. Colors represent the proportion of N and S mutations"
+```{r fig5, fig.cap=caption5}
 mutations <- pNpS_summary %>% gather(key = "Type", value = "Mean", factor_key = T, N,S)
-
 ggplot(mutations) + 
   geom_area(aes(x=t,y=Mean, fill=factor(Type)), position = "stack") +
   facet_wrap(~threshold, nrow = 2) +
@@ -124,3 +178,12 @@ ggplot(mutations) +
   theme(legend.title = element_text(size = 10) ) + labs(fill="Mutation type:   ")
 ```
 
+## What's next?
+
+## References
+
+Diaz-Uriarte, R. (2017). OncoSimulR: Genetic simulation with arbitrary epistasis and mutator genes in asexual populations. Bioinformatics, 33(12), 1898–1899. http://doi.org/10.1093/bioinformatics/btx077
+
+McFarland, C. D., Korolev, K. S., Kryukov, G. V., Sunyaev, S. R., & Mirny, L. A. (2013). Impact of deleterious passenger mutations on cancer progression. Proceedings of the National Academy of Sciences, 110(8), 2910–2915. http://doi.org/10.1073/pnas.1213968110
+
+Milholland, B., Dong, X., Zhang, L., Hao, X., Suh, Y., & Vijg, J. (2017). Differences between germline and somatic mutation rates in humans and mice. Nature Communications, 8(May), 1–8. http://doi.org/10.1038/ncomms15183
