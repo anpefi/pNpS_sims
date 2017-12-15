@@ -1,13 +1,11 @@
 ---
-title: "Neutral scenario"
+title: "Evolution of the pN/pS in tumors: neutral scenario"
 author: "Andres Perez-Figueroa"
-date: "2017-12-13"
 output:
   html_document:
     fig_caption: yes
-    fig_height: 6
+    fig_height: 8
     fig_width: 10
-    highlight: tango
     theme: readable
 ---
 
@@ -35,8 +33,12 @@ However, **in this scenario all the N (non-synonimous) mutations have no effect*
 where $N$ here is the current tumor size and $K$ is the initial equilibrium population size. As the authors explain, for large $N/K$ the above expression recapitulates Gompertzian dynamics observed experimentally for large tumors. Under the current neutral scenario, this means that population size would be buffered by the changes in the death rate.
 
 
-### Parameters
-  
+### Simulation settings
+
+We arbitrarily created a genome of 10000 synonymous sites (S). The number of non-sybobynous sites (N) used is 27600, to fit the estimation of $N/S = 2.76$ obtained in human soman based on codon usage and mutational spectrum (Milhollland et al. 2017). This yield a total number of 37600 sites. In this scenario all the N sites are neutral. The mutation rate is set in $2.66\times10^{-9}$ as representative of human somatic mutation (Milholland et al. 2017). A starting population of 10000 cells, all with the same genotype, is evolved for 50000 time units, taking samples avery 500 time units. This simulation setting is replicated 1000 times.
+    
+      
+      
 | Parameter |  Value |
 | ---- | ---- |
 | Total loci (sites) | 37600 |
@@ -51,7 +53,7 @@ where $N$ here is the current tumor size and $K$ is the initial equilibrium popu
 | Initial size | 10000 cells |
 | replicates | 1000 |
 
-Table: Table 1. Parameter values used in this simulation
+Table: Parameter values used in this simulation
   
 ## Results
 
@@ -60,21 +62,19 @@ library(tidyverse, quietly = T, warn.conflicts = FALSE)
 knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning=FALSE, cache = TRUE)
 ```
 
-
-
 ```{r read_data}
 samples <- readRDS(here::here("results","neu_McFL.data.rds"))
 samples$threshold <- as.factor(samples$threshold)
 levels(samples$threshold) <- c("All", "f > 0.001", "f > 0.01", "f > 0.05")
 ```
 
-
-
 ```{r summarize}
-TS_summary <- samples  %>% filter(threshold=="All") %>% group_by(model,t) %>%  
+TS_summary <- samples  %>% filter(threshold=="All") %>% group_by(t) %>%  
   summarise(
     mean_TS=mean(TS, na.rm = T),
-    median_TS=median(TS, na.rm = T)
+    median_TS=median(TS, na.rm = T),
+    max_TS=max(TS, na.rm=T),
+    min_TS=min(TS, na.rm=T)
     ) 
 
 pNpS_summary <- samples  %>% group_by(model,threshold, t) %>%  
@@ -96,31 +96,17 @@ expSamples <- readRDS(here::here("results","neu_Exp.samples.1e-09.rds"))
 expSamples$rep <- rep(1:100, each=101) #Only 100 replicates
 expMeans <- expSamples %>% group_by(t) %>%  summarise(mean_TS=mean(TS, na.rm = T) ) 
 ```
-  
-  
-```{r captions}
-caption1 <- "Figure 1. Population size across time under the neutral scenario with
- the MacFarland model. Gray points represent individual values for each of the 1000 replicates. Blue line shows the mean number of cells. Dashed black line shows 
- the equilibrium size."
-caption2 <- "Figure 2. Population size across time under the neutral scenario with
- the Exponential model. Gray lines represent different replicates (only 100). Blue line shows the mean number of cells in all replicates. Dashed black line shows the initial size."
-caption3 <- "Figure 3. pN/pS replicates across time under the neutral case. Each line
- represents the loess regression of the median for 1000 replicates by sampling
- those variants with frequencies above the threshold."
-caption4 <- "Figure 4. Distribution of pN/pS at different time points. "
-caption5 <- "Figure 5. Average number of detected variants across the time. Colors represent the proportion of N and S mutations."
-```
 
 ### Evolution of the population size
 
-As expected, under the McFarland model the population size (number of cells) remains quite stable around the initial size of 10000 cells (**Figure 1**). This size is the equilibrium value and if the population size increases then the death rate also increases, and viceversa. This helped to keep the population size very stable within a very limited range of ~ 9500-10500 cells. 
+As expected, under the McFarland model the population size (number of cells) remains quite stable around the initial size of 10000 cells (Figure 1). This size is the equilibrium value and if the population size increases then the death rate also increases, and viceversa. This helped to keep the population size very stable within a very limited range of ~ 9500-10500 cells. 
   
-```{r fig1, fig.cap=caption1}
+```{r fig1, fig.cap="Fig 1: Population size across time under the neutral scenario with  the MacFarland model. Gray ribbon represents the range individual values for each of the 1000 replicates. Blue line shows the mean number of cells. Dashed black line shows  the equilibrium size."}
 
-ggplot(data = samples, mapping = aes(x=t, y=TS)) +
-    geom_point(aes(group=rep),color="grey", alpha=0.2, cex=0.1) +
+ggplot(TS_summary) +
+    geom_ribbon(aes(x=t,ymin=min_TS, ymax=max_TS),color="grey", alpha=0.3) +
     geom_abline(slope = 0, intercept = 10000, lty="dashed", lwd=0.5) +
-    geom_line(data=TS_summary, mapping = aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
+    geom_line(aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
     theme_classic(base_size = 18) + ylim(9000,11000) + 
     ylab("# Cells") + ggtitle("Population size", "McFarland model")
 ```
@@ -129,9 +115,9 @@ ggplot(data = samples, mapping = aes(x=t, y=TS)) +
     
        
     
-```{r fig2, fig.cap=caption2}
+```{r fig2, fig.cap="Fig 2: Population size across time under the neutral scenario with  the Exponential model. Gray lines represent different replicates (only 100). Blue line shows the mean number of cells in all replicates. Dashed black line shows the initial size."}
 ggplot(data = expSamples, mapping = aes(x=t, y=TS)) +
-    geom_line(aes(group=rep),color="black", alpha=0.8, cex=0.2) +
+    geom_line(aes(group=rep),color="black", alpha=0.6, cex=0.2) +
     geom_abline(slope = 0, intercept = 10000, lty="dashed", lwd=0.5) +
     geom_line(expMeans, mapping = aes(x=t,y=mean_TS), color="blue", lwd=1.2) +
     theme_classic(base_size = 18) + 
@@ -144,41 +130,40 @@ ggplot(data = expSamples, mapping = aes(x=t, y=TS)) +
   
   
 
-```{r fig3, fig.cap=caption3}
+```{r fig3, fig.cap="Fig 3: pN/pS replicates across time under the neutral case. Each line represents the loess regression of the median for 1000 replicates by sampling those variants with frequencies above the threshold."}
 ggplot() +
   geom_smooth(data = pNpS_summary, mapping = aes(x=t,y=median_pN_pS, color=threshold), se=F) +
   geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
   theme_classic(base_size = 18) + ylim(0,2) + ylab("pN/pS") +
-  theme(legend.position = "top", legend.text = element_text(size = 10)) +
-  theme(legend.title = element_text(size = 10) ) + labs(color="Frequency threshold:  ")
+  theme(legend.position = "top", legend.text = element_text(size = 12)) +
+  theme(legend.title = element_text(size = 12) ) + labs(color="Frequency threshold:  ")
 ```
   
   Figure 4 show the distribution of the pN/pS under the different sampling regimes in three time points. The biggest differences are very early in the evolution of the population but the distributions are getting closer after ¿long? time.
   
   
-```{r fig4, fig.cap=caption4}
+```{r fig4, fig.cap="Fig 4: Distribution of pN/pS at different time points"}
 ggplot(data=samples %>% filter(t %in% c(500,25000,50000)) ) +
   geom_boxplot(mapping = aes(x=factor(t), y=pN_pS, fill=threshold), outlier.size = 0.2 ) +
   geom_abline(slope = 0, intercept = 1, lty="dashed", lwd=0.5) +
   theme_classic(base_size = 18) + ylim(0,7.5) + ylab("pN/pS") + xlab("t") +
-  theme(legend.position = "top", legend.text = element_text(size = 10)) +
-  theme(legend.title = element_text(size = 10) ) + labs(fill="Frequency threshold:   ")
+  theme(legend.position = "top", legend.text = element_text(size = 12)) +
+  theme(legend.title = element_text(size = 12) ) + labs(fill="Frequency threshold:   ")
 ```
    
  Figure 5 shows the absolute number of mutations detected  under the different sampling regimes and their proportion into N and S. Here is the explanation for the differences in the distributions of pN/pS. The overall number of mutations detected is very low at early times, and for different sampling regimes are obviously lower. This produces some noise in the pN/pS as in early times there are replicates whitout N (pN/pS=0) or whitout S (pN/pS=NA). In this context, where there are on average ~12 mutations segregating in the population, the calculation of pN/pS is very noisy. 
     
 
-```{r fig5, fig.cap=caption5}
+```{r fig5, fig.cap="Fig 5: Average number of detected variants across the time. Colors represent the proportion of N and S mutations."}
 mutations <- pNpS_summary %>% gather(key = "Type", value = "Mean", factor_key = T, N,S)
 ggplot(mutations) + 
   geom_area(aes(x=t,y=Mean, fill=factor(Type)), position = "stack") +
   facet_wrap(~threshold, nrow = 2) +
-  theme_bw(base_size = 15) + ylim(0,15) + ylab("Average detected variants") + xlab("t") +
-  theme(legend.position = "top", legend.text = element_text(size = 10)) +
-  theme(legend.title = element_text(size = 10) ) + labs(fill="Mutation type:   ")
+  theme_bw(base_size = 18) + ylim(0,15) + ylab("Average detected variants") + xlab("t") +
+  theme(legend.position = "top", legend.text = element_text(size = 12)) +
+  theme(legend.title = element_text(size = 12) ) + labs(fill="Mutation type:   ")
 ```
 
-## What's next?
 
 ## References
 
