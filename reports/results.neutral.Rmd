@@ -35,7 +35,7 @@ where $N$ here is the current tumor size and $K$ is the initial equilibrium popu
 
 ### Simulation settings
 
-We arbitrarily created a genome of 10000 synonymous sites (S). The number of non-sybobynous sites (N) used is 27600, to fit the estimation of $N/S = 2.76$ obtained in human soman based on codon usage and mutational spectrum (Milhollland et al. 2017). This yield a total number of 37600 sites. In this scenario all the N sites are neutral. The mutation rate is set in $2.66\times10^{-9}$ as representative of human somatic mutation (Milholland et al. 2017). A starting population of 10000 cells, all with the same genotype, is evolved for 50000 time units, taking samples avery 500 time units. This simulation setting is replicated 1000 times.
+We arbitrarily created a genome of 10000 synonymous sites (S). The number of non-synonymous sites (N) used is 27600, to fit the estimation of $N/S = 2.76$ obtained in human soma based on codon usage and mutational spectrum (Milhollland et al. 2017). This yield a total number of 37600 sites. In this scenario all the N sites are neutral. The mutation rate is set in $2.66\times10^{-9}$ as representative of human somatic mutation (Milholland et al. 2017). A starting population of 10000 cells, all with the same genotype, is evolved for 50000 time units, taking samples every 500 time units. This simulation setting is replicated 1000 times.
     
       
       
@@ -126,7 +126,7 @@ ggplot(data = expSamples, mapping = aes(x=t, y=TS)) +
   
 ### Evolution of the pN/pS
   
-  When considering all the variants already present in the population, the pN/pS quickly tends to 1 (Figure 3). When we only measure those variants above a (detection) threshold, the pN/pS is usually below 1 during long time. This is particularly true for a threshold of 5%, the usual frequency fot a variant be detected by NGS.
+  When considering all the variants already present in the population, the pN/pS quickly tends to 1 (Figure 3). When we only measure those variants above a (detection) threshold, the pN/pS is usually below 1 during long time. This is particularly true for a threshold of 5%, the usual frequency for a variant be detected by NGS.
   
   
 
@@ -151,7 +151,7 @@ ggplot(data=samples %>% filter(t %in% c(500,25000,50000)) ) +
   theme(legend.title = element_text(size = 12) ) + labs(fill="Frequency threshold:   ")
 ```
    
- Figure 5 shows the absolute number of mutations detected  under the different sampling regimes and their proportion into N and S. Here is the explanation for the differences in the distributions of pN/pS. The overall number of mutations detected is very low at early times, and for different sampling regimes are obviously lower. This produces some noise in the pN/pS as in early times there are replicates whitout N (pN/pS=0) or whitout S (pN/pS=NA). In this context, where there are on average ~12 mutations segregating in the population, the calculation of pN/pS is very noisy. 
+ Figure 5 shows the absolute number of mutations detected  under the different sampling regimes and their proportion into N and S. Here is the explanation for the differences in the distributions of pN/pS. The overall number of mutations detected is very low at early times, and for different sampling regimes are obviously lower. This produces some noise in the pN/pS as in early times there are replicates without N (pN/pS=0) or without S (pN/pS=NA). In this context, where there are on average ~12 mutations segregating in the population, the calculation of pN/pS is very noisy. 
     
 
 ```{r fig5, fig.cap="Fig 5: Average number of detected variants across the time. Colors represent the proportion of N and S mutations."}
