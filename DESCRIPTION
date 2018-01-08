@@ -1,8 +1,8 @@
 Package: pNpS.sims
-Title: What the Package Does (one line, title case)
+Title: Simulations for assessing the evoution of the ratio between non-synonymous and synonymous mutations under different selection regimes
 Version: 0.0.0.9000
 Authors@R: person("Andres", "Perez-Figueroa", email = "anpefi@uvigo.es", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Description: This repository stands for all the code related to the simulations of tumors using OncoSimulR (Diaz-Uriarte 2017) for assessing the evoution of the ratio between non-synonymous and synonymous mutations under different selection regimes.
 Depends: R (>= 3.4.2)
 License: What license is it under?
 Encoding: UTF-8
