@@ -19,6 +19,8 @@ option_list = list(
                 help="Time interval to the simulation check the status"),
     make_option(c("--keepEvery"), action="store", default=100, type='double',
                 help="#Time units to keep samples for further analysis"),
+    make_option(c("--wall.time"), action="store", default=600, type='integer',
+                help="maximum wall time"),
 
 
     make_option(c("-m", "--mu"), action="store", default=2.66e-9, type='double',
@@ -36,7 +38,7 @@ option_list = list(
                 help="Selection coefficient of driver mutations"),
     make_option(c("--s_neg"), action="store", default=-0.1, type='double',
                 help="Selection coefficient of driver mutations"),
-    make_option(c("--mutationPropGroth"), action="store_true", default=FALSE, type='logical',
+    make_option(c("--mutationPropGrowth"), action="store_true", default=TRUE, type='logical',
                 help="Is the mutation rate proportional to the pop growth rate?"),
     make_option(c("--onlyCancer"), action="store_true", default=FALSE, type='logical',
                 help="Repeat if cancer not reached"),
@@ -80,7 +82,7 @@ if(seed>0) set.seed(seed)
 pp <- oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = onlyCancer, detectionSize = detectionSize,
                    detectionDrivers = NA, detectionProb = NA, sampleEvery=sampleEvery,
                    initSize = initSize, finalTime = finalTime, keepEvery=keepEvery,
-                   mutationPropGrowth = TRUE, mc.cores = mc.cores, max.wall.time = 600,
+                   mutationPropGrowth = mutationPropGrowth, mc.cores = mc.cores, max.wall.time = wall.time,
                    errorHitWallTime=FALSE)
 
 saveRDS(pp,file = paste0(id,".pop.rds"), compress = "gzip")
