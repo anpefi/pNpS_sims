@@ -2,6 +2,8 @@ scratch/
 scratch
 run/
 .tmp
+*.out
+*.rds
 
 # History files
 .Rhistory
