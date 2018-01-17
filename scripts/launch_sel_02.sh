@@ -21,7 +21,7 @@ export SCRATCH=$PROJ_DIR/scratch
 export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
-NAME=sel_01_McFL_$SLURM_ARRAY_TASK_ID
+NAME=sel_02_McFL_$SLURM_ARRAY_TASK_ID
 $SCRIPT_DIR/run_simulation.R -i $NAME --seed 0 --nNS_pos 500 --nNS_neg 5000 \
           --nNS_neu 22100 -c 1 --sampleEvery 0.0025 --reps 1 --model McFL \
           --finalTime 1000 --initSize 100000 --keepEvery 5 \
