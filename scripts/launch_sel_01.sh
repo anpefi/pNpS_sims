@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH -J sel_01_McFL           # Job name
-#SBATCH -o sel_01_McFL-%a.out    # Specify stdout output file (%j expands to jobId)
-#SBATCH -a 1-10
+#SBATCH -o sel_01_McFL.out    # Specify stdout output file (%j expands to jobId)
+#SBATCH -a 1-100
 #SBATCH -n 1                     # Total number of tasks
-#SBATCH -t 08:00:00
+#SBATCH -t 02:00:00
 #SBATCH --mem-per-cpu 20GB
 
 set -e
