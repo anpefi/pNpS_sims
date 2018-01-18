@@ -22,8 +22,8 @@ export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
 NAME=sel_05_McFL_$SLURM_ARRAY_TASK_ID
-$SCRIPT_DIR/run_simulation.R -i $NAME --seed 0 --nNS_pos 0 --nNS_neg 15000 \
-          --nNS_neu 12600 -c 1 --sampleEvery 0.0025 --reps 1 --model McFL \
+$SCRIPT_DIR/run_simulation.R -i $NAME --seed 0 --nNS_pos 0 --nNS_neg 27000 \
+          --nNS_neu 100 -c 1 --sampleEvery 0.0025 --reps 1 --model McFL \
           --finalTime 1000 --initSize 100000 --keepEvery 5 \
           --detectionSize 1e08
 $SCRIPT_DIR/run_sampling.R -i $NAME --dir results
