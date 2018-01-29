@@ -33,7 +33,10 @@ extract_samples <- function(x, opt){
                    d=rep(opt$det.limit, n),
                    N=rep(NA,m),S=rep(NA,m), drivers=rep(NA,m),
                    deletereous=rep(NA,m),
-                   pN_pS=rep(NA,m))
+                   pN_pS=rep(NA,m),
+                   clonal_drivers=rep(NA,m),
+                   clonal_N=rep(NA,m),
+                   clonal_S=rep(NA,m))
   z <- 1
   for (i in 1:n){
     #if (!is.element(x$pops.by.time[i,1], tsamples)) break
@@ -59,9 +62,24 @@ extract_samples <- function(x, opt){
       S <-sum(variants[nNS+1:opt$nS])
       if (S>0) pNpS <- (N / nNS) / (S / opt$nS)
       else pNpS <- NA
-      result[z,] <- c(tsamples[i],popSize,w,d,N,S,drivers,deletereous,pNpS)
+
+      #clonal (fixed), obtained only if d==0
+      if(d<=1e-09) {
+        clonal <- as.numeric(freqs==1)
+        cl_drivers <- sum(clonal[1:opt$nNS_pos])
+        cl_N <-sum(clonal[1:nNS])
+        cl_S <-sum(clonal[nNS+1:opt$nS])
+        result[z,] <- c(tsamples[i],popSize,w,d,N,S,drivers,deletereous,pNpS,
+                        cl_drivers, cl_N, cl_S)
+      } else {
+        result[z,] <- c(tsamples[i],popSize,w,d,N,S,drivers,deletereous,pNpS,
+                        NA, NA, NA)
+      }
+
+
       z <- z + 1
     }
+
 
   }
 
