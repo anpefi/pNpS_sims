@@ -54,7 +54,7 @@ extract_samples <- function(x, opt){
     for(d in opt$det.limit){
       variants <- as.numeric(freqs > d)
       drivers <- sum(variants[1:opt$nNS_pos])
-      deletereous <- sum(variants[1:opt$nNS_neg])
+      deletereous <- sum(variants[(opt$nNS_pos+1):(opt$nNS_pos+opt$nNS_neg)])
       N <-sum(variants[1:nNS])
       S <-sum(variants[nNS+1:opt$nS])
       if (S>0) pNpS <- (N / nNS) / (S / opt$nS)
