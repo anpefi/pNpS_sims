@@ -13,7 +13,9 @@ option_list = list(
   optparse::make_option(c("--model"), action="store", default="Exp", type='character',
                 help="Model used in this simulation (Exp/McFL)"),
   optparse::make_option(c("-r", "--reps"), action="store", default=100, type='integer',
-                help="This is the number of individuals/replicates to tub"),
+                        help="This is the number of replicates of cohorts to run"),
+  optparse::make_option(c("--inds"), action="store", default=100, type='integer',
+                        help="This is the number of individuals in the cohort"),
   optparse::make_option(c("-n", "--initSize"), action="store", default=10000, type='integer',
                 help="Initial size for the cell population"),
   optparse::make_option(c("-t", "--finalTime"), action="store", default=3000, type='integer',
@@ -85,13 +87,17 @@ if(seed>0) set.seed(seed)
 result <- NULL
 
 for (r in 1:reps){ ## Change
-  pp <- OncoSimulR::oncoSimulPop(reps, fe, model=model, mu= mu, onlyCancer = onlyCancer,
+  pp <- OncoSimulR::oncoSimulPop(inds, fe, model=model, mu= mu, onlyCancer = onlyCancer,
                                  detectionSize = detectionSize, detectionDrivers = NA,
                                  detectionProb = NA, sampleEvery=sampleEvery,
                                  initSize = initSize, finalTime = finalTime,
                                  keepEvery=keepEvery, mutationPropGrowth = mutationPropGrowth,
                                  mc.cores = mc.cores, max.wall.time = wall.time,
                                  errorHitWallTime=FALSE)
+
+  fitness <- sapply(pp,extract_fitness_genes, loci, opt) %>% t %>% colMeans %>%
+    t %>% as.data.frame
+  colnames(fitness) <- c("w_total", "w_driver","w_deletereous", "w_neutral")
 
   samples <- OncoSimulR::samplePop(pp,thresholdWhole = 1e-9 )
 
@@ -102,7 +108,7 @@ for (r in 1:reps){ ## Change
     as.data.frame
   FinalSize <- do.call("rbind", lapply(pp, "[[", "TotalPopSize")) %>% mean
   FinalTime <- do.call("rbind", lapply(pp, "[[", "FinalTime")) %>% mean
-  result <- rbind(result, cbind(r, data, FinalSize, FinalTime))
+  result <- rbind(result, cbind(r, data, FinalSize, FinalTime, fitness))
 }
 write_csv(result,paste0(id,".result.csv"))
 
