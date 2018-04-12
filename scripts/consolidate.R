@@ -2,13 +2,15 @@
 
 library(tidyverse, quietly = T, warn.conflicts = FALSE)
 
-samples03 <- do.call("rbind", lapply(list.files("results/", pattern = "sel_03_McFL_[0-9]*.samples.rds", full.names = TRUE),readRDS))
+samples <- do.call("rbind",
+  lapply(list.files(here::here("results"),
+  pattern = "sel_0[0-5]_Exp_[0-9]*.samples.rds",
+  full.names = TRUE),
+  function(X){readRDS(X) %>%
+              mutate(case=X %>% stringr::str_split("_") %>%
+              unlist %>% .[3] %>% as.factor,
+              rep = X %>%  stringr::str_extract("Exp.*samples") %>%
+                stringr::str_sub(5,-9) %>% as.numeric )}))
+levels(samples$case) <- c("neutral", "symmetric", "10x_negative", "mostly_negative", "all_positive", "all_negative")
 
-samples03 <- samples03 %>% filter(d==1e-09)
-r <- samples03 %>% filter(t==0, d==1e-09) %>% count %>% as.numeric
-times <- samples03 %>% filter(d==1e-09) %>% count %>% as.numeric / r
-
-
-saveRDS(samples, "results/sel_03_McFL.data.rds")
-
-samples <- do.call("rbind", lapply(list.files("results/", pattern = "sel_01_McFl_[5-9]*.samples.rds", full.names = TRUE),readRDS))
+saveRDS(samples, "results/sel_All_Exp.data.rds")
