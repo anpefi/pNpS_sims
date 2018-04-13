@@ -69,21 +69,42 @@ files <- dir(data_path, pattern = "sel_41_.*result" )
 data <- files %>%
   map(~ read_csv(file.path(data_path, .))) %>%
   reduce(rbind) %>%
-  mutate(s_pos = 0.05, s_neg= -0.05) %>%
+  mutate(s_pos = 0.33, s_neg= -0.05) %>%
   rbind(data)
 
 files <- dir(data_path, pattern = "sel_42_.*result" )
 data <- files %>%
   map(~ read_csv(file.path(data_path, .))) %>%
   reduce(rbind) %>%
-  mutate(s_pos = 0.05, s_neg= -0.1) %>%
+  mutate(s_pos = 0.33, s_neg= -0.1) %>%
   rbind(data)
 
 files <- dir(data_path, pattern = "sel_43_.*result" )
 data <- files %>%
   map(~ read_csv(file.path(data_path, .))) %>%
   reduce(rbind) %>%
-  mutate(s_pos = 0.05, s_neg= -0.2) %>%
+  mutate(s_pos = 0.33, s_neg= -0.2) %>%
+  rbind(data)
+
+files <- dir(data_path, pattern = "sel_51_.*result" )
+data <- files %>%
+  map(~ read_csv(file.path(data_path, .))) %>%
+  reduce(rbind) %>%
+  mutate(s_pos = 1.0, s_neg= -0.05) %>%
+  rbind(data)
+
+files <- dir(data_path, pattern = "sel_52_.*result" )
+data <- files %>%
+  map(~ read_csv(file.path(data_path, .))) %>%
+  reduce(rbind) %>%
+  mutate(s_pos = 1.0, s_neg= -0.1) %>%
+  rbind(data)
+
+files <- dir(data_path, pattern = "sel_53_.*result" )
+data <- files %>%
+  map(~ read_csv(file.path(data_path, .))) %>%
+  reduce(rbind) %>%
+  mutate(s_pos = 1.0, s_neg= -0.2) %>%
   rbind(data)
 
 write_csv(data, "results/table.csv")
