@@ -22,5 +22,5 @@ export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
 NAME=sel_31_Exp_$SLURM_ARRAY_TASK_ID
-$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.2 --s_neg -0.05
+$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.2 --s_neg -0.05  -r 25
 

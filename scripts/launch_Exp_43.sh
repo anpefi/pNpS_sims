@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#SBATCH -J Exp_32           # Job name
-#SBATCH -o Exp_32.out    # Specify stdout output file (%j expands to jobId)
-#SBATCH -a 1-100
+#SBATCH -J Exp_43           # Job name
+#SBATCH -o Exp_43.out    # Specify stdout output file (%j expands to jobId)
+#SBATCH -a 1-400
 #SBATCH -n 1                     # Total number of tasks
 #SBATCH -t 03:00:00
 #SBATCH --mem-per-cpu 20GB
@@ -21,6 +21,6 @@ export SCRATCH=$PROJ_DIR/scratch
 export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
-NAME=sel_32_Exp_$SLURM_ARRAY_TASK_ID
-$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.2 --s_neg -0.1 -r 25
+NAME=sel_43_Exp_$SLURM_ARRAY_TASK_ID
+$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.33 --s_neg -0.2 -r 25
 
