@@ -12,19 +12,17 @@ option_list = list(
                 help="ID name for this run"),
   optparse::make_option(c("--model"), action="store", default="Exp", type='character',
                 help="Model used in this simulation (Exp/McFL)"),
-  optparse::make_option(c("-r", "--reps"), action="store", default=100, type='integer',
+  optparse::make_option(c("-r", "--reps"), action="store", default=3, type='integer',
                         help="This is the number of replicates of cohorts to run"),
-  optparse::make_option(c("--inds"), action="store", default=100, type='integer',
-                        help="This is the number of individuals in the cohort"),
   optparse::make_option(c("-n", "--initSize"), action="store", default=10000, type='integer',
                 help="Initial size for the cell population"),
   optparse::make_option(c("-t", "--finalTime"), action="store", default=3000, type='integer',
                 help="Max time units to evolve the cell population"),
   optparse::make_option(c("--detectionSize"), action="store", default=1e8, type='integer',
                 help="Threshold population size to stop the simulation"),
-  optparse::make_option(c("--sampleEvery"), action="store", default=0.1, type='double',
+  optparse::make_option(c("--sampleEvery"), action="store", default=1, type='double',
                 help="Time interval to the simulation check the status"),
-  optparse::make_option(c("--keepEvery"), action="store", default=3000, type='double',
+  optparse::make_option(c("--keepEvery"), action="store", default=1, type='double',
                 help="#Time units to keep samples for further analysis"),
   optparse::make_option(c("--wall.time"), action="store", default=600, type='integer',
                 help="maximum wall time"),
@@ -35,22 +33,20 @@ option_list = list(
     # Number of loci. N/S ~ 2.76 following Mulholland et al 2017
 
 
-  optparse::make_option(c("--nNS_gene"), action="store", default=552, type='integer',
+  optparse::make_option(c("--nNS_gene"), action="store", default=5520, type='integer',
                         help="Number of Non-Synonymous mutations in each gene"),
-  optparse::make_option(c("--nS_gene"), action="store", default=200, type='integer',
+  optparse::make_option(c("--nS_gene"), action="store", default=2000, type='integer',
                         help="Number of Synonymous mutations in each gene"),
 
 
-  optparse::make_option(c("--s_pos"), action="store", default=0.1, type='double',
+  optparse::make_option(c("--s_pos"), action="store", default=1, type='double',
                 help="Selection coefficient of driver mutations"),
-  optparse::make_option(c("--s_neg"), action="store", default=-0.1, type='double',
+  optparse::make_option(c("--s_neg"), action="store", default=-0.5, type='double',
                 help="Selection coefficient of driver mutations"),
   optparse::make_option(c("--mutationPropGrowth"), action="store_true", default=TRUE, type='logical',
                 help="Is the mutation rate proportional to the pop growth rate?"),
   optparse::make_option(c("--onlyCancer"), action="store_true", default=TRUE, type='logical',
                 help="Repeat if cancer not reached"),
-  optparse::make_option(c("-c","--mc.cores"), action="store", default=1, type='integer',
-                help="number of cores"),
   optparse::make_option(c("--seed"), action="store", default=0, type='integer',
                 help="seed for random number generator (0 for time)"),
   optparse::make_option(c("--debug"), action="store_true", default=FALSE, type='logical',
@@ -84,32 +80,44 @@ RNGkind("Mersenne-Twister")
 if(seed>0) set.seed(seed)
 
 #Run
-result <- NULL
+headers <- c("N_driver","S_driver","N_neutral","S_neutral","N_deletereous","S_deletereous",
+             "sp_N_driver","sp_S_driver","sp_N_neutral","sp_S_neutral","sp_N_deletereous",
+             "sp_S_deletereous","cl_N_driver","cl_S_driver","cl_N_neutral","cl_S_neutral",
+             "cl_N_deletereous","cl_S_deletereous","w_total","w_driver","w_deletereous",
+             "w_neutral","tumor_size","healthy_size","Time","id","rep","pNpS_driver",
+             "pNpS_neutral","pNpS_deletereous","pNpS_sp_driver","pNpS_sp_neutral",
+             "pNpS_sp_deletereous","dNdS_driver","dNdS_neutral","dNdS_deletereous",
+             "s_pos","s_neg")
+write_csv(as.data.frame(t(headers)), paste0(id,".result.csv"), col_names = FALSE)
 
 for (r in 1:reps){ ## Change
-  pp <- OncoSimulR::oncoSimulPop(inds, fe, model=model, mu= mu, onlyCancer = onlyCancer,
+    pp <- OncoSimulR::oncoSimulIndiv(fe, model=model, mu= mu, onlyCancer = onlyCancer,
                                  detectionSize = detectionSize, detectionDrivers = NA,
                                  detectionProb = NA, sampleEvery=sampleEvery,
                                  initSize = initSize, finalTime = finalTime,
                                  keepEvery=keepEvery, mutationPropGrowth = mutationPropGrowth,
-                                 mc.cores = mc.cores, max.wall.time = wall.time,
+                                 max.wall.time = wall.time,
                                  errorHitWallTime=FALSE)
+    result <- extract_results(pp,loci, opt)
+    colnames(result) <- headers[1:25]
 
-  fitness <- sapply(pp,extract_fitness_genes, loci, opt) %>% t %>% colMeans %>%
-    t %>% as.data.frame
-  colnames(fitness) <- c("w_total", "w_driver","w_deletereous", "w_neutral")
+    result <- result %>% as.data.frame %>% mutate(
+        id,
+        r,
+        ((N_driver/nNS_gene)/(S_driver/nS_gene)),
+        ((N_neutral/nNS_gene)/(S_neutral/nS_gene)),
+        ((N_deletereous/nNS_gene)/(S_deletereous/nS_gene)),
+        ((sp_N_driver/nNS_gene)/(sp_S_driver/nS_gene)),
+        ((sp_N_neutral/nNS_gene)/(sp_S_neutral/nS_gene)),
+        ((sp_N_deletereous/nNS_gene)/(sp_S_deletereous/nS_gene)),
+        ((cl_N_driver/nNS_gene)/(cl_S_driver/nS_gene)),
+        ((cl_N_neutral/nNS_gene)/(cl_S_neutral/nS_gene)),
+        ((cl_N_deletereous/nNS_gene)/(cl_S_deletereous/nS_gene)),
+        s_pos, s_neg
+      )
 
-  samples <- OncoSimulR::samplePop(pp,thresholdWhole = 1e-9 )
-
-  genes_cohorts <- as.data.frame(t(samples)) %>%
-    split(rep(1:3, each=(nNS_gene+nS_gene)))
-  names(genes_cohorts) <- c("driver","deletereous","neutral")
-  data <- lapply(genes_cohorts, function(X){calc_pNpS_cohort(t(X),nNS_gene,nS_gene)}) %>%
-    as.data.frame
-  FinalSize <- do.call("rbind", lapply(pp, "[[", "TotalPopSize")) %>% mean
-  FinalTime <- do.call("rbind", lapply(pp, "[[", "FinalTime")) %>% mean
-  result <- rbind(result, cbind(r, data, FinalSize, FinalTime, fitness))
+    write_csv(result, paste0(id,".result.csv"), col_names = FALSE, append = TRUE)
 }
-write_csv(result,paste0(id,".result.csv"))
+
 
 detach(opt)
