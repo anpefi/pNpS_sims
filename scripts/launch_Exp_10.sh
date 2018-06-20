@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J Exp_22           # Job name
-#SBATCH -o Exp_22.out    # Specify stdout output file (%j expands to jobId)
+#SBATCH -J Exp_10           # Job name
+#SBATCH -o Exp_10.out    # Specify stdout output file (%j expands to jobId)
 #SBATCH -a 1-10
 #SBATCH -n 1                     # Total number of tasks
 #SBATCH -t 24:00:00
@@ -21,7 +21,7 @@ export SCRATCH=$PROJ_DIR/scratch
 export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
-NAME=Exp_22_$SLURM_ARRAY_TASK_ID
-$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.5 --s_neg -0.5 -r 100 --model Exp --keepEvery 1
+NAME=Exp_10_$SLURM_ARRAY_TASK_ID
+$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.1 --s_neg 0 -r 100 --model Exp --keepEvery 10
 
 
