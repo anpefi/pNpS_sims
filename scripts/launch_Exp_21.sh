@@ -22,6 +22,6 @@ export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
 NAME=Exp_21_$SLURM_ARRAY_TASK_ID
-$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.5 --s_neg -0.1-r 100 --model Exp --keepEvery 1
+$SCRIPT_DIR/run_simulation2.R -i $NAME --s_pos 0.5 --s_neg -0.1 -r 100 --model Exp --keepEvery 1
 
 
