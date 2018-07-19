@@ -1,16 +1,12 @@
-#' Extract fitness of samples from a oncoSimulIndiv object
+#' Extract results from a oncoSimulIndiv object
 #'
-#' @description For three genes cases
+#' @description For the different  genes cases
 #'
 #' @param x An oncoSimulIndiv object
 #' @param loci A vector of the selection coefficents for each locus
 #' @param opt A list with the options of the simulations
-#'   The needed elements are:
-#'   nNS_gene
-#'   nS_gene
-#'   s_pos
-#'   s_neg
-#' @return A vector of fitness for all the tumor and individual genes
+#'
+#' @return A data.frame for all the stats computed
 
 extract_results <- function(x, loci, opt, d = 0.05){
 
@@ -24,15 +20,23 @@ extract_results <- function(x, loci, opt, d = 0.05){
   n <- nrow(x$pops.by.time)
 
   gene_size <- opt$nNS_gene+opt$nS_gene
-  driver <- rep(c(TRUE,FALSE,FALSE),rep(gene_size,3))
-  neutral <- rep(c(FALSE,FALSE,TRUE),rep(gene_size,3))
-  deletereous <- rep(c(FALSE,TRUE,FALSE),rep(gene_size,3))
-  NS_site <- rep(rep(c(TRUE,FALSE),c(opt$nNS_gene,opt$nS_gene)), 3)
+  total_genes <- opt$n_pos + opt$n_neu + opt$n_neg
+
+  driver <-
+    rep(c(rep(TRUE,opt$n_pos),rep(FALSE,opt$n_neg),rep(FALSE,opt$n_neu)),
+        rep(gene_size,total_genes))
+  neutral <-
+    rep(c(rep(FALSE,opt$n_pos),rep(FALSE,opt$n_neg),rep(TRUE,opt$n_neu)),
+        rep(gene_size,total_genes))
+  deletereous <-
+    rep(c(rep(FALSE,opt$n_pos),rep(TRUE,opt$n_neg),rep(FALSE,opt$n_neu)),
+        rep(gene_size,total_genes))
+  NS_site <- rep(rep(c(TRUE,FALSE),c(opt$nNS_gene,opt$nS_gene)), total_genes)
   S_site <- !NS_site
 
 
 
-  tumorGenotype <- apply(x$Genotypes[1:opt$nNS_gene,],2, sum) > 0
+  tumorGenotype <- apply(x$Genotypes[NS_site & driver,],2, sum) > 0
   result <- NULL
   for (i in 2:n){ #Avoid t=0
     pop <- x$pops.by.time[i, -1]
@@ -40,8 +44,7 @@ extract_results <- function(x, loci, opt, d = 0.05){
     tumorSize <- sum(pop[tumorGenotype])
 
     if(tumorSize < 1 && opt$s_pos > 0) next
-    if (tumorSize > 0) nsize <- tumorSize
-    else nsize <- popSize
+    if (tumorSize > 0) {nsize <- tumorSize} else nsize <- popSize
 
     freqs <- tcrossprod(pop[tumorGenotype], x$Genotypes[,tumorGenotype])/nsize
 
@@ -51,31 +54,31 @@ extract_results <- function(x, loci, opt, d = 0.05){
 
     #Number of mutations (variants)
     result <- rbind(result,
-                 c( sum(variants[ NS_site & driver]),
-                 sum(variants[ S_site & driver]),
-                 sum(variants[ NS_site & neutral]),
-                 sum(variants[ S_site & neutral]),
-                 sum(variants[ NS_site & deletereous]),
-                 sum(variants[ S_site & deletereous]),
-                 sum(sampled[ NS_site & driver]),
-                 sum(sampled[ S_site & driver]),
-                 sum(sampled[ NS_site & neutral]),
-                 sum(sampled[ S_site & neutral]),
-                 sum(sampled[ NS_site & deletereous]),
-                 sum(sampled[ S_site & deletereous]),
-                 sum(clonal[ NS_site & driver]),
-                 sum(clonal[ S_site & driver]),
-                 sum(clonal[ NS_site & neutral]),
-                 sum(clonal[ S_site & neutral]),
-                 sum(clonal[ NS_site & deletereous]),
-                 sum(clonal[ S_site & deletereous]),
-                 prod(1 + freqs*loci),
-                 prod(1 + freqs[driver]*loci[driver]),
-                 prod(1 + freqs[deletereous]*loci[deletereous]),
-                 prod(1 + freqs[neutral]*loci[neutral]), #This should be 1
-                 tumorSize,
-                 popSize - tumorSize,
-                 x$pops.by.time[i,1] )
+                 c( sum(variants[ NS_site & driver])/opt$n_pos,
+                    sum(variants[ S_site & driver])/opt$n_pos,
+                    sum(variants[ NS_site & neutral])/opt$n_neu,
+                    sum(variants[ S_site & neutral])/opt$n_neu,
+                    sum(variants[ NS_site & deletereous])/opt$n_neg,
+                    sum(variants[ S_site & deletereous])/opt$n_neg,
+                    sum(sampled[ NS_site & driver])/opt$n_pos,
+                    sum(sampled[ S_site & driver])/opt$n_pos,
+                    sum(sampled[ NS_site & neutral])/opt$n_neu,
+                    sum(sampled[ S_site & neutral])/opt$n_neu,
+                    sum(sampled[ NS_site & deletereous])/opt$n_neg,
+                    sum(sampled[ S_site & deletereous])/opt$n_neg,
+                    sum(clonal[ NS_site & driver])/opt$n_pos,
+                    sum(clonal[ S_site & driver])/opt$n_pos,
+                    sum(clonal[ NS_site & neutral])/opt$n_neu,
+                    sum(clonal[ S_site & neutral])/opt$n_neu,
+                    sum(clonal[ NS_site & deletereous])/opt$n_neg,
+                    sum(clonal[ S_site & deletereous])/opt$n_neg,
+                    prod(1 + freqs*loci),
+                    prod(1 + freqs[driver]*loci[driver]),
+                    prod(1 + freqs[deletereous]*loci[deletereous]),
+                    prod(1 + freqs[neutral]*loci[neutral]), #This should be 1
+                    tumorSize,
+                    popSize - tumorSize,
+                    x$pops.by.time[i,1] )
             )
   }
   return(result)
