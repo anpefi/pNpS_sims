@@ -8,48 +8,71 @@ suppressPackageStartupMessages(require(tidyverse))
 devtools::load_all(here::here(),quiet = TRUE)
 
 option_list = list(
-  optparse::make_option(c("-i", "--id"), action="store", default="run", type='character',
+  optparse::make_option(c("-i", "--id"), action="store", default="run",
+                        type='character',
                 help="ID name for this run"),
-  optparse::make_option(c("--model"), action="store", default="Exp", type='character',
+  optparse::make_option(c("--model"), action="store", default="McFL",
+                        type='character',
                 help="Model used in this simulation (Exp/McFL)"),
-  optparse::make_option(c("-r", "--reps"), action="store", default=3, type='integer',
+  optparse::make_option(c("-r", "--reps"), action="store", default=1,
+                        type='integer',
                         help="This is the number of replicates of cohorts to run"),
-  optparse::make_option(c("-n", "--initSize"), action="store", default=10000, type='integer',
+  optparse::make_option(c("-n", "--initSize"), action="store", default=20,
+                        type='integer',
                 help="Initial size for the cell population"),
-  optparse::make_option(c("-t", "--finalTime"), action="store", default=3000, type='integer',
+  optparse::make_option(c("-t", "--finalTime"), action="store", default=50000,
+                        type='integer',
                 help="Max time units to evolve the cell population"),
-  optparse::make_option(c("--detectionSize"), action="store", default=1e8, type='integer',
+  optparse::make_option(c("--detectionSize"), action="store", default=1e7,
+                        type='integer',
                 help="Threshold population size to stop the simulation"),
-  optparse::make_option(c("--sampleEvery"), action="store", default=1, type='double',
+  optparse::make_option(c("--sampleEvery"), action="store", default=0.01,
+                        type='double',
                 help="Time interval to the simulation check the status"),
-  optparse::make_option(c("--keepEvery"), action="store", default=1, type='double',
-                help="#Time units to keep samples for further analysis"),
-  optparse::make_option(c("--wall.time"), action="store", default=600, type='integer',
+  optparse::make_option(c("--keepEvery"), action="store", default=50000,
+                        type='double',
+                        help="#Time units to keep samples for further analysis"),
+  optparse::make_option(c("--wall.time"), action="store", default=2000,
+                        type='integer',
                 help="maximum wall time"),
 
 
-  optparse::make_option(c("-m", "--mu"), action="store", default=2.66e-9, type='double',
-                help="Mutation rate (per site and cell division)"), #Following Milholland et al 2017
+  optparse::make_option(c("-m", "--mu"), action="store", default=1e-8,
+                        type='double',    help="Mutation rate (per site and cell division)"), #Following Milholland et al 2017 2.66e-9
     # Number of loci. N/S ~ 2.76 following Mulholland et al 2017
 
 
-  optparse::make_option(c("--nNS_gene"), action="store", default=5520, type='integer',
+  optparse::make_option(c("--nNS_gene"), action="store", default=500, type='integer',
                         help="Number of Non-Synonymous mutations in each gene"),
-  optparse::make_option(c("--nS_gene"), action="store", default=2000, type='integer',
+  optparse::make_option(c("--nS_gene"), action="store", default=500, type='integer',
                         help="Number of Synonymous mutations in each gene"),
+  optparse::make_option(c("--prop_eff"), action="store", default=0.2,
+                        type='double',
+                        help="Proportion of NS mutations with effect"),
+
+  optparse::make_option(c("--n_pos"), action="store", default=1, type='integer',
+                        help="Number of driver (with s_pos) genes"),
+  optparse::make_option(c("--n_neu"), action="store", default=1, type='integer',
+                        help="Number of neutral genes"),
+  optparse::make_option(c("--n_neg"), action="store", default=1, type='integer',
+                        help="Number of deletereous (with s_neg) genes"),
+
+  optparse::make_option(c("--s_pos"), action="store", default=0.5, type='double',
+                help="Selection coefficient of driver mutations"),
+  optparse::make_option(c("--s_neg"), action="store", default=0, type='double',
+                help="Selection coefficient of driver mutations"),
 
 
-  optparse::make_option(c("--s_pos"), action="store", default=1, type='double',
-                help="Selection coefficient of driver mutations"),
-  optparse::make_option(c("--s_neg"), action="store", default=-0.5, type='double',
-                help="Selection coefficient of driver mutations"),
-  optparse::make_option(c("--mutationPropGrowth"), action="store_true", default=TRUE, type='logical',
+  optparse::make_option(c("--mutationPropGrowth"), action="store_true",
+                        default=TRUE, type='logical',
                 help="Is the mutation rate proportional to the pop growth rate?"),
-  optparse::make_option(c("--onlyCancer"), action="store_true", default=TRUE, type='logical',
+  optparse::make_option(c("--onlyCancer"), action="store_true", default=TRUE,
+                        type='logical',
                 help="Repeat if cancer not reached"),
   optparse::make_option(c("--seed"), action="store", default=0, type='integer',
                 help="seed for random number generator (0 for time)"),
-  optparse::make_option(c("--debug"), action="store_true", default=FALSE, type='logical',
+  optparse::make_option(c("--debug"), action="store_true", default=FALSE,
+                        type='logical',
                 help="Run with debugging options")
 )
 opt = optparse::parse_args(optparse::OptionParser(option_list=option_list))
@@ -61,15 +84,23 @@ if(!debug) options(warn = -1)
 
 # Initalizing some variables
 ## gene driver
-gene_drv <- c( rep(s_pos,nNS_gene), rep(0,nS_gene) )
-gene_neg <- c( rep(s_neg,nNS_gene), rep(0,nS_gene) )
-gene_neu <- c( rep(0,nNS_gene), rep(0,nS_gene) )
+eff_pos <- floor(nNS_gene*prop_eff)
+gene_drv <-
+  rep(c( rep(s_pos,floor(nNS_gene*prop_eff)),
+         rep(0,nNS_gene-floor(nNS_gene*prop_eff)),
+         rep(0,nS_gene) ), n_pos)
+gene_neg <-
+  rep(c( rep(s_neg,floor(nNS_gene*prop_eff)),
+         rep(0,nNS_gene-floor(nNS_gene*prop_eff)),
+         rep(0,nS_gene) ), n_neg)
+gene_neu <-
+  rep(c( rep(0,nNS_gene), rep(0,nS_gene) ), n_neu)
 gene_size <- nNS_gene + nS_gene
 
 
 loci <- c(gene_drv,gene_neg,gene_neu)
 names(loci) <- 1:length(loci)
-drvNames = names(loci[1:nNS_gene])
+drvNames = names(loci[1:nNS_gene*prop_eff])
 
 # Setting the Fitness effect on the simulator
 fe <- OncoSimulR::allFitnessEffects(noIntGenes = loci, drvNames = drvNames )
@@ -91,17 +122,24 @@ headers <- c("N_driver","S_driver","N_neutral","S_neutral","N_deletereous","S_de
 write_csv(as.data.frame(t(headers)), paste0(id,".result.csv"), col_names = FALSE)
 
 for (r in 1:reps){ ## Change
-    pp <- OncoSimulR::oncoSimulIndiv(fe, model=model, mu= mu, onlyCancer = onlyCancer,
-                                 detectionSize = detectionSize, detectionDrivers = NA,
-                                 detectionProb = NA, sampleEvery=sampleEvery,
-                                 initSize = initSize, finalTime = finalTime,
-                                 keepEvery=keepEvery, mutationPropGrowth = mutationPropGrowth,
-                                 max.wall.time = wall.time,
-                                 errorHitWallTime=FALSE)
-    result <- extract_results(pp,loci, opt)
-    colnames(result) <- headers[1:25]
+    pp <- OncoSimulR::oncoSimulIndiv(fe, model=model, mu= mu,
+                                     onlyCancer = onlyCancer,
+                                     detectionSize = detectionSize,
+                                     detectionDrivers = NA,
+                                     detectionProb = NA, sampleEvery=sampleEvery,
+                                     initSize = initSize, finalTime = finalTime,
+                                     keepEvery=keepEvery,
+                                     mutationPropGrowth = mutationPropGrowth,
+                                     max.wall.time = wall.time,
+                                     errorHitWallTime=FALSE)
+    if(is.null(pp$TotalPopSize)){
+      cat("Failed replicate ",r, "\n")
 
-    result <- result %>% as.data.frame %>% mutate(
+    } else {
+      result <- extract_results(pp,loci, opt)
+      colnames(result) <- headers[1:25]
+
+      result <- result %>% as.data.frame %>% mutate(
         id,
         r,
         ((N_driver/nNS_gene)/(S_driver/nS_gene)),
@@ -116,7 +154,8 @@ for (r in 1:reps){ ## Change
         s_pos, s_neg
       )
 
-    write_csv(result, paste0(id,".result.csv"), col_names = FALSE, append = TRUE)
+      write_csv(result, paste0(id,".result.csv"), col_names = FALSE, append = TRUE)
+    }
 }
 
 
