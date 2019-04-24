@@ -14,13 +14,13 @@ option_list = list(
   optparse::make_option(c("--model"), action="store", default="McFL",
                         type='character',
                 help="Model used in this simulation (Exp/McFL)"),
-  optparse::make_option(c("-r", "--reps"), action="store", default=1,
+  optparse::make_option(c("-r", "--reps"), action="store", default=10,
                         type='integer',
                         help="This is the number of replicates of cohorts to run"),
   optparse::make_option(c("-n", "--initSize"), action="store", default=20,
                         type='integer',
                 help="Initial size for the cell population"),
-  optparse::make_option(c("-t", "--finalTime"), action="store", default=50000,
+  optparse::make_option(c("-t", "--finalTime"), action="store", default=500000,
                         type='integer',
                 help="Max time units to evolve the cell population"),
   optparse::make_option(c("--detectionSize"), action="store", default=1e7,
@@ -29,7 +29,7 @@ option_list = list(
   optparse::make_option(c("--sampleEvery"), action="store", default=0.01,
                         type='double',
                 help="Time interval to the simulation check the status"),
-  optparse::make_option(c("--keepEvery"), action="store", default=50000,
+  optparse::make_option(c("--keepEvery"), action="store", default=500000,
                         type='double',
                         help="#Time units to keep samples for further analysis"),
   optparse::make_option(c("--wall.time"), action="store", default=2000,
@@ -46,7 +46,7 @@ option_list = list(
                         help="Number of Non-Synonymous mutations in each gene"),
   optparse::make_option(c("--nS_gene"), action="store", default=500, type='integer',
                         help="Number of Synonymous mutations in each gene"),
-  optparse::make_option(c("--prop_eff"), action="store", default=0.2,
+  optparse::make_option(c("--prop_eff"), action="store", default=0.5,
                         type='double',
                         help="Proportion of NS mutations with effect"),
 
@@ -112,14 +112,15 @@ if(seed>0) set.seed(seed)
 
 #Run
 headers <- c("N_driver","S_driver","N_neutral","S_neutral","N_deletereous","S_deletereous",
-             "sp_N_driver","sp_S_driver","sp_N_neutral","sp_S_neutral","sp_N_deletereous",
-             "sp_S_deletereous","cl_N_driver","cl_S_driver","cl_N_neutral","cl_S_neutral",
-             "cl_N_deletereous","cl_S_deletereous","w_total","w_driver","w_deletereous",
-             "w_neutral","tumor_size","healthy_size","Time","id","rep","pNpS_driver",
-             "pNpS_neutral","pNpS_deletereous","pNpS_sp_driver","pNpS_sp_neutral",
-             "pNpS_sp_deletereous","dNdS_driver","dNdS_neutral","dNdS_deletereous",
-             "s_pos","s_neg")
-write_csv(as.data.frame(t(headers)), paste0(id,".result.csv"), col_names = FALSE)
+	     "sp_N_driver","sp_S_driver","sp_N_neutral","sp_S_neutral","sp_N_deletereous",
+	     "sp_S_deletereous","cl_N_driver","cl_S_driver","cl_N_neutral","cl_S_neutral",
+	     "cl_N_deletereous","cl_S_deletereous","w_total","w_driver","w_deletereous",
+	     "w_neutral","tumor_size","n_clones","largest_clone","healthy_size","Time","id",
+	     "s_pos","s_neg", "N_sites", "S_sites", "prop_eff")
+
+if(!file.exists(paste0(id,".result.csv"))){
+    write_csv(as.data.frame(t(headers)), paste0(id,".result.csv"), col_names = FALSE)
+}
 
 for (r in 1:reps){ ## Change
     pp <- OncoSimulR::oncoSimulIndiv(fe, model=model, mu= mu,
@@ -136,22 +137,13 @@ for (r in 1:reps){ ## Change
       cat("Failed replicate ",r, "\n")
 
     } else {
-      result <- extract_results(pp,loci, opt)
-      colnames(result) <- headers[1:25]
+      sim <- extract_results(pp,loci, opt)
+      result <- sim$result
+      colnames(result) <- headers[1:27]
 
       result <- result %>% as.data.frame %>% mutate(
         id,
-        r,
-        ((N_driver/nNS_gene)/(S_driver/nS_gene)),
-        ((N_neutral/nNS_gene)/(S_neutral/nS_gene)),
-        ((N_deletereous/nNS_gene)/(S_deletereous/nS_gene)),
-        ((sp_N_driver/nNS_gene)/(sp_S_driver/nS_gene)),
-        ((sp_N_neutral/nNS_gene)/(sp_S_neutral/nS_gene)),
-        ((sp_N_deletereous/nNS_gene)/(sp_S_deletereous/nS_gene)),
-        ((cl_N_driver/nNS_gene)/(cl_S_driver/nS_gene)),
-        ((cl_N_neutral/nNS_gene)/(cl_S_neutral/nS_gene)),
-        ((cl_N_deletereous/nNS_gene)/(cl_S_deletereous/nS_gene)),
-        s_pos, s_neg
+        s_pos, s_neg, nNS_gene, nS_gene, prop_eff
       )
 
       write_csv(result, paste0(id,".result.csv"), col_names = FALSE, append = TRUE)

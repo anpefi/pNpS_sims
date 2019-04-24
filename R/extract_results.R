@@ -42,6 +42,8 @@ extract_results <- function(x, loci, opt, d = 0.05){
     pop <- x$pops.by.time[i, -1]
     popSize <- x$PerSampleStats[i, 1]
     tumorSize <- sum(pop[tumorGenotype])
+    n_clones <- sum(pop[tumorGenotype]/tumorSize>0.05) #Avoid undeveloped mutants
+    lg_clone <- max(pop[tumorGenotype])
 
     if(tumorSize < 1 && opt$s_pos > 0) next
     if (tumorSize > 0) {nsize <- tumorSize} else nsize <- popSize
@@ -50,7 +52,7 @@ extract_results <- function(x, loci, opt, d = 0.05){
 
     variants <- freqs > 0 #True variants, all of them
     sampled <- freqs > d  #sampled variants, those above the detection threshold
-    clonal <- freqs > 0.95 #Fixed (with some error) variants
+    clonal <- freqs == 1 #Fixed variants
 
     #Number of mutations (variants)
     result <- rbind(result,
@@ -76,11 +78,12 @@ extract_results <- function(x, loci, opt, d = 0.05){
                     prod(1 + freqs[driver]*loci[driver]),
                     prod(1 + freqs[deletereous]*loci[deletereous]),
                     prod(1 + freqs[neutral]*loci[neutral]), #This should be 1
-                    tumorSize,
+                    tumorSize, n_clones, lg_clone/tumorSize,
                     popSize - tumorSize,
                     x$pops.by.time[i,1] )
             )
   }
-  return(result)
+  out <- list(result=result,freqs=freqs)
+  return(out)
 
 }
