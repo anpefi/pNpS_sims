@@ -1,0 +1,128 @@
+// cancer model
+
+
+initialize() {
+  initializeSLiMModelType("nonWF");
+  defineConstant("N0", 1000);
+
+  if(s>0){   //s given as argument
+    defineConstant("s_pos", s);
+    defineConstant("s_neg", 0.0);
+  }
+  else{
+    defineConstant("s_pos", 0.0);
+    defineConstant("s_neg", -s);
+  }
+  defineConstant("T_G", 100.0); // Generation time
+
+  initializeSLiMOptions(mutationRuns=1); //Optimization
+
+  initializeMutationRate(mu); //mu given as argument
+  initializeRecombinationRate(0.0);
+  initializeMutationType("m1", 1, "f", 0.0); // N mutations
+  initializeMutationType("m2", 1  , "f", 0.0); // S mutations
+  m1.mutationStackPolicy = "l";
+  m2.mutationStackPolicy = "l";
+  initializeGenomicElementType("g1", c(m1,m2), c(1,1));
+  initializeGenomicElement(g1, 0, 999);
+
+
+  
+}
+reproduction() {
+  d=0;
+  p=0;
+  if(s>0) {d = individual.countOfMutationsOfType(m1);}
+  if(s<0) {p = individual.countOfMutationsOfType(m1);}
+  
+  B = (((1+s_pos)^d)/((1+s_neg)^p)) / T_G ; //Following McFarland et al 2013 
+
+  if (B>1.0){B=1.0;}
+
+  individual.setValue("B",B);
+  if(rbinom(1, 1, B)==1) {
+    p1.addCloned(individual);
+  }
+  
+}
+
+
+
+1 early() {
+  //cat("\nt \tn \tN_all \tS_all \tN_sp \tS_sp \tN_cl \tS_cl \n");
+  sim.setValue("Ninds",N0);
+  sim.addSubpop("p1", sim.getValue("Ninds"));
+  sim.rescheduleScriptBlock(s1, start=tmax, end=tmax);
+  
+}
+
+early() {
+ K = N0/(exp(1)-1);
+  if (sim.generation>1) {
+      p1.fitnessScaling =   1.0 -  (log(1.0 + (p1.individualCount / asFloat(K))) / T_G);
+  }
+ 
+   
+}
+
+late() {
+ 
+    end = F;
+    inds = p1.individuals;
+  
+
+
+  if((size(inds) > Nmax) | (sim.generation==tmax)) end = T;  //Nmax and tmax given as argument
+
+  // output
+  //if(sim.generation % (T_G*100) == 0 | end == T){
+  if(end == T){
+    mut = sim.mutations;
+    driver = sim.mutationsOfType(m1);
+    Nmut = sum(mut.mutationType == m1);
+    if(isNULL(Nmut)){Nmut = 0;}
+    Smut = sum(mut.mutationType == m2);
+    if(isNULL(Smut)){Smut = 0;}
+
+    m1_sp = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.025);
+    m2_sp = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.025);
+
+    m1_cl = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.49);
+    m2_cl = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.49);
+
+
+
+    /*
+    cat(format("%d", asInteger(sim.generation/T_G)));
+    cat(format(" \t%d", size(inds)));
+    cat(format(" \t%d", Nmut));
+    cat(format(" \t%d", Smut));
+    cat(format(" \t%d", m1_sp));
+    cat(format(" \t%d", m2_sp));
+    cat(format(" \t%d", m1_cl));
+    cat(format(" \t%d", m2_cl));
+    */
+
+    //File output
+    outLine = paste(c(asInteger(sim.generation/T_G), end, size(inds), Nmut, Smut,m1_sp,m2_sp,m1_cl,m2_cl),",");
+    if (!writeFile(paste(c(name,".results.csv"),""), outLine, append=T))
+            stop("Error writing file.");
+  
+  
+  }
+  if (end ) {
+    sim.simulationFinished();
+    outLine = paste(c("N",sim.mutationFrequencies(p1, sim.mutationsOfType(m1))),",");
+    outLine2 = paste(c("S",sim.mutationFrequencies(p1, sim.mutationsOfType(m2))),",");
+
+    if (!writeFile(paste(c(name,".freqs.csv"),""), paste(c(outLine,outLine2),"\n"), append=T))
+            stop("Error writing file.");
+    
+ 
+  }
+  sim.setValue("Ninds", size(inds));
+}
+
+s1 200000 late(){
+
+}

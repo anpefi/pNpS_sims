@@ -1,0 +1,136 @@
+// cancer model
+
+
+initialize() {
+  initializeSLiMModelType("nonWF");
+  defineConstant("N0", 1000);
+  defineConstant("s_pos", 0.0);
+  defineConstant("s_neg", 1);
+  defineConstant("T_G", 100.0); // Generation time
+
+  initializeSLiMOptions(mutationRuns=1); //Optimization
+
+  initializeMutationRate(1e-6);
+  initializeRecombinationRate(0.0);
+  
+  initializeMutationType("m1", 1, "f", 0.0); // driver mutations
+  initializeMutationType("m2", 1  , "f", 0.0); // neutral mutations
+  initializeMutationType("m3", 1  , "f", 0.0); // deletereous mutations
+  m1.mutationStackPolicy = "l";
+  m2.mutationStackPolicy = "l";
+  m3.mutationStackPolicy = "l";
+  initializeGenomicElementType("g1", c(m1,m2,m3), c(1,1,1));
+  initializeGenomicElement(g1, 0, 1499);
+
+catn("spos: "+ s_pos);
+
+  
+}
+reproduction() {
+  d = individual.countOfMutationsOfType(m1);
+  p = individual.countOfMutationsOfType(m3);
+  
+  B = (((1+s_pos)^d)/((1+s_neg)^p)) / T_G ; //Following McFarland et al 2013 
+
+  if (B>1.0){B=1.0;}
+
+  individual.setValue("B",B);
+  if(rbinom(1, 1, B)==1) {
+    p1.addCloned(individual);
+  }
+  
+}
+
+
+
+1 early() {
+  cat("\nt(d) \tn \tw \tm1 \tm2 \tm3 \tpN/pS+ \tpN/pS- \tm1_s \tm2_s \tm3_s \tm1_c \tm2_c \tm3_c \n");
+  sim.setValue("Ninds",N0);
+  //sim.setValue("countB",0);
+  sim.addSubpop("p1", sim.getValue("Ninds"));
+  
+}
+
+early() {
+ K = N0/(exp(1)-1);
+  if (sim.generation>1) {
+      p1.fitnessScaling =   1.0 -  (log(1.0 + (p1.individualCount / asFloat(K))) / T_G);
+  }
+ 
+   
+}
+
+late() {
+ 
+    end = F;
+    inds = p1.individuals;
+  
+    //countB = sim.getValue("countB");
+    //sim.setValue("countB", 0);
+
+  if(size(inds) > 1e7) end = T;
+
+  // output
+  if(sim.generation % (T_G*1) == 0 | sim.generation == 1| end == T){
+    mut = sim.mutations;
+    driver = sim.mutationsOfType(m1);
+    Nmut = mean(mut.mutationType == m1);
+    if(isNULL(Nmut)){Nmut = 0;}
+    Smut = mean(mut.mutationType == m2);
+    if(isNULL(Smut)){Smut = 0;}
+    Dmut = mean(mut.mutationType == m3);
+    if(isNULL(Dmut)){Dmut = 0;}
+    Nmut = asInteger(Nmut * size(mut));
+    Smut = asInteger(Smut * size(mut));
+    Dmut = asInteger(Dmut * size(mut));
+    m1_detected = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.025);
+    m2_detected = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.025);
+    m3_detected = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m3)) > 0.025);
+    m1_clonal = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.49);
+    m2_clonal = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.49);
+    m3_clonal = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m3)) > 0.49);
+
+
+    cat(format("%d", asInteger(sim.generation/T_G)));
+    cat(format(" \t%d", size(inds)));
+    //cat(format(" \t%.2f", b));
+    cat(format(" \t%.3f", mean(p1.cachedFitness(NULL))));
+    //cat(format(" \t%d", countB));
+    cat(format(" \t%d", Nmut));
+    cat(format(" \t%d", Smut));
+    cat(format(" \t%d", Dmut));
+    cat(format(" \t%.3f", (Nmut/Smut)));
+    cat(format(" \t%.3f", (Dmut/Smut)));
+    cat(format(" \t%d", m1_detected));
+    cat(format(" \t%d", m2_detected));
+    cat(format(" \t%d", m3_detected));
+    cat(format(" \t%d", m1_clonal));
+    cat(format(" \t%d", m2_clonal));
+    cat(format(" \t%d", m3_clonal));
+  catn("");
+  }
+  if (end ) {
+    sim.simulationFinished();
+    //sim.outputFull(filePath="pop.out", ages=T);
+    //sim.outputMutations( sim.mutations);
+    cat("\nq(m1): ");
+    print(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)));
+    cat("q(m2): ");
+    print(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)));
+    cat("\nq(m3): ");
+    print(sim.mutationFrequencies(p1, sim.mutationsOfType(m3)));
+  }
+  sim.setValue("Ninds", size(inds));
+}
+
+1000000 late() {
+	//sim.outputFull(filePath="pop.out", ages=T);
+	//sim.outputMutations( sim.mutations);
+  cat("\nq(m1): ");
+  print(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)));
+  cat("\nq(m2): ");
+  print(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)));
+  cat("\nq(m23): ");
+  print(sim.mutationFrequencies(p1, sim.mutationsOfType(m3)));
+}
+
