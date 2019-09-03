@@ -8,7 +8,7 @@
 #'
 #' @return A data.frame for all the stats computed
 
-extract_results <- function(x, loci, opt, d = 0.05){
+extract_results <- function(x, loci, opt, d = 0.05, onlyCancer = TRUE){
 
   if(class(opt)!="list"){
     stop("opt is not a list")
@@ -36,7 +36,12 @@ extract_results <- function(x, loci, opt, d = 0.05){
 
 
 
-  tumorGenotype <- apply(x$Genotypes[NS_site & driver,],2, sum) > 0
+  if (onlyCancer){
+    tumorGenotype <- apply(x$Genotypes[NS_site & driver,],2, sum) > 0
+  }
+  else{
+    tumorGenotype <- apply(x$Genotypes,2, sum) > 0
+  }
   result <- NULL
   for (i in 2:n){ #Avoid t=0
     pop <- x$pops.by.time[i, -1]
