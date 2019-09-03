@@ -11,7 +11,7 @@ set -e
 ## launch_simulations.sh
 
 #load modules
-module load gcc R
+module load gcc/6.4.0 R/2.6.0
 
 # DEFINE ENVIRONMENT VARIABLES
 export PROJ_DIR=$HOME/pNpS.sims

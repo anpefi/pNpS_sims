@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH -J McF_11           # Job name
-#SBATCH -o McF_11.out    # Specify stdout output file (%j expands to jobId)
+#SBATCH -J McF_41           # Job name
+#SBATCH -o McF_41.out    # Specify stdout output file (%j expands to jobId)
 #SBATCH -n 1                     # Total number of tasks
 #SBATCH -t 8:00:00
 #SBATCH --mem-per-cpu 5GB
@@ -21,7 +21,7 @@ export RES_DIR=$PROJ_DIR/results
 
 cd $RES_DIR
 $SCRIPT_DIR/run_simulation2.R -i $SLURM_JOB_NAME --model McFL --sampleEvery 0.01 \
-  --s_pos 0.5 --s_neg -0.25 \
+  --s_pos 2 --s_neg -0.25 \
   -r 100  -t 50000 --keepEvery 50000 \
   --n_pos 1 --n_neu 1 --n_neg 1 \
   --nNS_gene 500 --nS_gene 500 --prop_eff 0.5 \
