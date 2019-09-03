@@ -4,6 +4,7 @@ run/
 .tmp
 *.out
 *.rds
+scripts/archive
 
 # History files
 .Rhistory
