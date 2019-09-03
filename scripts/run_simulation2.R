@@ -68,12 +68,15 @@ option_list = list(
                 help="Is the mutation rate proportional to the pop growth rate?"),
   optparse::make_option(c("--onlyCancer"), action="store_true", default=TRUE,
                         type='logical',
-                help="Repeat if cancer not reached"),
+                  help="Repeat if cancer not reached"),
   optparse::make_option(c("--seed"), action="store", default=0, type='integer',
                 help="seed for random number generator (0 for time)"),
   optparse::make_option(c("--debug"), action="store_true", default=FALSE,
                         type='logical',
-                help="Run with debugging options")
+                help="Run with debugging options"),
+  optparse::make_option(c("--save_freqs"), action="store_true", default=FALSE,
+                        type='logical',
+                        help="Save frequencies to a file")
 )
 opt = optparse::parse_args(optparse::OptionParser(option_list=option_list))
 saveRDS(opt, file= paste0(opt$id,".opt.rds"), compress = FALSE)
@@ -133,11 +136,11 @@ for (r in 1:reps){ ## Change
                                      mutationPropGrowth = mutationPropGrowth,
                                      max.wall.time = wall.time,
                                      errorHitWallTime=FALSE)
-    if(is.null(pp$TotalPopSize)){
+    if(is.null(pp$TotalPopSize) || pp$HittedWallTime || dim(pp$Genotypes)[2]<=1){
       cat("Failed replicate ",r, "\n")
 
     } else {
-      sim <- extract_results(pp,loci, opt)
+      sim <- extract_results(pp,loci, opt, onlyCancer)
       result <- sim$result
       colnames(result) <- headers[1:27]
 
@@ -145,8 +148,13 @@ for (r in 1:reps){ ## Change
         id,
         s_pos, s_neg, nNS_gene, nS_gene, prop_eff
       )
-
       write_csv(result, paste0(id,".result.csv"), col_names = FALSE, append = TRUE)
+
+      freqs <- sim$freqs %>% as.data.frame %>% mutate(
+        id,
+        s_pos, s_neg, nNS_gene, nS_gene, prop_eff
+      )
+      write_csv(freqs, paste0(id,".freqs.csv"), col_names = FALSE, append = TRUE)
     }
 }
 
