@@ -1,0 +1,311 @@
+---
+title: 'Finding negative selection in cancer using pN/pS: insights from computer simulations'
+date: "25/06/2019"
+author: "Andrés Pérez-Figueroa & David Posada"
+output:
+  html_document: 
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 10
+    highlight: tango
+    theme: readable
+---
+```{r setup, include=FALSE, message=FALSE}
+library(tidyverse, quietly = T, warn.conflicts = FALSE)
+library(data.table)
+library(extrafont)
+library(gridExtra)
+knitr::opts_chunk$set(message = FALSE, warning=FALSE, cache = FALSE, 
+                      echo = FALSE, fig.height = 12, fig.width = 16)
+knitr::opts_knit$set(eval.after = "fig.cap")
+caption <- "generic caption"
+```
+
+## Introduction
+
+[...]  
+  
+A recent study have observed a universal pattern of selection in somatic evolution, characterized by a dominance of positive over negative selection (Martincorena et al., 2017). They suggest that negative selection on point mutations is absent both during the tumor progression as during the normal tissue maintenance. To reach those conclusions they used a widely used tool in evolutionary biology, the dN/dS ratio, the ratio between the rate of non-synonymous substitutions per non-synonymous site and the rate of synonymous substitutions per synonymous site (Yang and Bielawski, 2000).  [...]
+
+  
+[...]
+
+
+## Methods
+
+We simulated tumor progression using OncoSimulR (Diaz-Uriarte, 2017), a clonal-based forward-time genetic simulator for biallelic markers in asexually reproducing populations without spatial structure (perfect mixing). We defined a genome of three different genes for each cell. Each gene is 1000 biallelic sites long, with half of those sites being potentially non-synonymous (500 Nsites) and the other half being potentially synonymous (500 Ssites). There are three types of mutations regarding their selective effect on fitness (birth rate): Driver mutations, with a positive selection coefficient (s+) and that can only appear in half of the N sites of one of the three genes (driver gene); Deletereous mutations, with a positive selection coefficient (s+) and that can only appear in half of the N sites of another of the three genes (deletereous gene); and neutral mutations, without effect on fitness and that can appear in all the remaining sites, including the full third gene (neutral gene). Clones are groups of cells with the same genotype that evolve in a continuous-time fashion following a logistic-like model (McFarland et al., 2013) defined by the following birth (b) and death (d) rates:
+
+$$b = \frac{(1+s⁺)^{n_{drivers}}}{(1-s⁻)^{n_{deletereous}}}$$
+
+$$d=\log(1+N/K)$$ 
+
+where *ndrivers* and *ndeletereous* are, respectively, the number of driver and deletereous mutations present in the genotype, N is the population (tumor) size, and K is whatever it is. Each simulation (patient) started with a group of 20 wild (normal) cells that divide at a rate b and die at a rate d. In each cell division mutation can occur in each of the wild sites (there is no recurrent mutation) at a rate of μ = 10⁻⁸. Depending on the site where the mutation takes place, it will be deleterious, neutral or driver. When the first driver mutation appears, a tumor starts to grow until it reaches a threshold size of 10⁷ cells when the simulation stops and then the frequency of each mutation is recovered from the full tumor. By counting the number of mutations present in Nsites (N) and Ssites (S) for each gene, and adding the values for cohorts of 100 tumors, we obtain the pN/pS ratio by simply dividing both values for each gene, given the symmetry in the number of sites of a type and another. 3000 tumors (30 cohorts) were simulated for each of the different scenarios with the orthogonal combination of the following selection coefficients for positive and negative mutations: s⁺ = {0.05, 0.1, 0.25, 0.5, 0.75, 1, 2}, s⁻ = {-1, -0.75, -0.5, -0.25, 0}. All parameters described above were chosen so as to reach a compromise in terms of time and other computing resources and the number of mutations obtained at the end of the simulation runs.
+    
+To assess the relationship between the selection coefficient and the pN/pS ratio, we used a set of simulations where only a type of effect (positive or negative) could happen. For the positive effect (s > 0) we used the above scenarios where s⁻ = 0, and check only the pN/ps for the driver gene. For the negative scenarios (s >= 0), we run an additional set of scenarios setting s⁺ = 0 and looking for the pN/pS in the deletereous gene. As in this last case there is no population growth (no positive selection) we started with a population of 1000 cells and allow evolution for 50000 time units (enough to reach an equilibrium).
+
+## Results
+
+[...]
+
+```{r load_data, include=FALSE}
+csize <- 100 #max cohort size
+files <- list.files(path = here::here("results"), pattern = "McF.*\\.result\\.csv", full.names = T)
+big_table <- lapply(files, read_csv) %>% bind_rows() %>% filter(!is.na(s_pos), s_neg>=-1)
+```
+
+
+[...]     
+
+
+```{r}
+prog_data <- big_table %>%
+  filter(s_pos>0) %>%
+  group_by(s_pos,s_neg) %>% 
+  mutate(cohort=rep(1:n(),each=csize)[1:n()]) %>% 
+  group_by(cohort,add = T) %>%
+  group_by(s_pos,s_neg) %>% 
+  select(s_pos, s_neg, Time, tumor_size, n_clones, largest_clone, w_total) %>%
+  summarise_all(mean) 
+  
+```
+
+```{r fig-prog, fig.height=8, fig.width=16, fig.cap=caption}
+
+fp1 <-gather(prog_data, "parameter", "value", Time) %>% mutate(value=log10(value)) %>%
+  ggplot(aes(x=s_neg,y=value)) +
+    geom_line(aes(color=as.factor(s_pos)),lwd=1.3) +
+    geom_point(aes(color=as.factor(s_pos))) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "bottom") +
+    labs(y="logartimic time", x="s-", color="      s+", subtitle = "Progression time")
+fp2 <-gather(prog_data, "parameter", "value", n_clones) %>%
+  ggplot(aes(x=s_neg,y=value)) +
+    geom_line(aes(color=as.factor(s_pos)),lwd=1.3) +
+    geom_point(aes(color=as.factor(s_pos))) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "none") +
+    ylim(c(0,5)) +
+    labs(y="number of clones", x="s-", color="      s+", subtitle = "Number of clones")
+fp3 <-gather(prog_data, "parameter", "value", largest_clone) %>%
+  ggplot(aes(x=s_neg,y=value)) +
+    geom_line(aes(color=as.factor(s_pos)),lwd=1.3) +
+    geom_point(aes(color=as.factor(s_pos))) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "none") +
+    ylim(c(0,1)) +
+    labs(y="proportion of tumor size", x="s-", color="      s+", subtitle = "Largest clone")
+
+
+ggpubr::ggarrange(fp1,fp2,fp3, nrow=1, legend = "bottom", common.legend = TRUE)
+
+caption <- "**Figure 1**. Parameters obtained at the end of the tumor progression for the different scenarios. Growth time represents the time, in decimal logarithmic scale, that the tumor took to reach the size of 10⁷ cells. The number of clones indicates the final number of clones present in the tumor, considering as clones the different genotypes with positive mutations present. The largest clone shows the proportion of the size of the tumor that occupies the majority clone."
+```
+
+
+
+
+[...]
+
+
+```{r create-pnps_table, fig.height=6.5, fig.width=14, fig.cap=caption}
+pnps_table <-big_table %>% 
+  filter(s_pos>0) %>%
+  group_by(s_pos,s_neg) %>% 
+  summarize_at(1:18,sum) %>%
+  mutate(all_driver=N_driver/S_driver,all_neutral=N_neutral/S_neutral,all_deletereous=N_deletereous/S_deletereous) %>%
+  mutate(sp_driver=sp_N_driver/sp_S_driver,sp_neutral=sp_N_neutral/sp_S_neutral,sp_deletereous=sp_N_deletereous/sp_S_deletereous) %>%
+  mutate(cl_driver=cl_N_driver/cl_S_driver,cl_neutral=cl_N_neutral/cl_S_neutral,cl_deletereous=cl_N_deletereous/cl_S_deletereous) %>%
+  gather (gene,pN_pS,all_driver:cl_deletereous, factor_key = TRUE) %>%
+  separate(gene,c("mutations","gene"), sep = "_") %>%
+  select(s_pos,s_neg,mutations,gene,pN_pS) 
+
+```
+
+```{r, fig.height=15, fig.width=14, fig.cap=caption}
+ind_plot <- function(X,y1=0,y2=2, tit){
+  X %>%
+    ggplot(aes(x=s_neg,y=pN_pS))+
+      geom_line(aes(color=as.factor(s_pos)),lwd=1.3) +
+      geom_point(aes(color=as.factor(s_pos))) +
+      ggpubr::theme_pubr(base_size = 20)+
+      geom_hline(yintercept = 1, lty="dashed") +
+      labs(y="pN/pS", x="s-", color="      s+", title=tit) +
+     ylim(c(y1,y2))+
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+      theme(plot.title = element_text(face = "bold", size=14))
+  
+  
+}
+
+tit.lab=c("A. Driver gene, all mutations",
+                           "B. Neutral gene, all mutations",
+                           "C. Deletereous gene, all mutations",
+                           "D. Driver gene, q > 0.5",
+                           "E. Neutral gene, q > 0.5",
+                           "F. Deletereous gene, q > 0.5",
+                           "G. Driver gene, q = 1",
+                           "H. Neutral gene, q = 1",
+                           "I. Deletereous gene, q = 1")
+
+f1 <- pnps_table %>% filter(mutations=="all",gene=="driver") %>% ind_plot(y1=0,y2=1.5, tit.lab[1])
+f2 <- pnps_table %>% filter(mutations=="all",gene=="neutral") %>% ind_plot(y1=0,y2=1.5, tit.lab[2])
+f3 <- pnps_table %>% filter(mutations=="all",gene=="deletereous") %>% ind_plot(y1=0,y2=1.5, tit.lab[3])
+f4 <- pnps_table %>% filter(mutations=="sp",gene=="driver") %>% ind_plot(y1=0,y2=50, tit.lab[4])
+f5 <- pnps_table %>% filter(mutations=="sp",gene=="neutral") %>% ind_plot(y1=0,y2=1.5, tit.lab[5])
+f6 <- pnps_table %>% filter(mutations=="sp",gene=="deletereous") %>% ind_plot(y1=0,y2=1.5, tit.lab[6])
+f7 <- pnps_table %>% filter(mutations=="cl",gene=="driver") %>% ind_plot(y1=0,y2=50, tit.lab[7])
+f8 <- pnps_table %>% filter(mutations=="cl",gene=="neutral") %>% ind_plot(y1=0,y2=1.5, tit.lab[8])
+f9 <- pnps_table %>% filter(mutations=="cl",gene=="deletereous") %>% ind_plot(y1=0,y2=1.5, tit.lab[9])
+
+
+ggpubr::ggarrange(f1,f2,f3, f4, f5,f6,f7,f8,f9, 
+                  nrow = 3, ncol=3, common.legend = TRUE, heights = c(4,4,4)
+                 )
+
+caption <- "**Figure 2.** Average pN/pS, considering all the mutations present in the tumor, for each of the three genes (driver, neutral and deletereous) in all the scenarios simulated for the different positive (s+, color lines) and negative (s-, x-axis) selection coefficient. A.B,C show the pN/pS calculated using all the simulations present in the tumot. D, E, F using only those mutations above the threshold frequency of 0.05. G, H, I use only the clonal mutations for the tumor, those present in all the cells.
+"
+```
+
+
+
+ 
+### VAF
+
+```{r}
+freqsQ <- fread(here::here("results","s_freqs_merged.csv"))
+```
+
+```{r}
+# Temp.
+files2 <- list.files(path = here::here("results"), pattern = "McF_31\\.freqs\\.csv", full.names = T)
+freqs <- lapply(files2, read_csv, col_names=FALSE) %>% bind_rows()
+```
+
+```{r}
+q <- freqs[1:1000,1:3000] %>% as.matrix %>% as.numeric
+nq <- 1000
+tFreqs <- data.frame(q=q, 
+                      gene=factor(c(rep("driver",nq*1000),rep("neutral",nq*1000),rep("deletereous",nq*1000)), 
+                                 levels = c("driver","neutral","deletereous")),
+                      mutation=factor(c(rep("N",nq*500),rep("S",nq*500),rep("N",nq*500),rep("S",nq*500),rep("N",nq*500),rep("S",nq*500)), 
+                                 levels = c("N","S")))
+```
+
+```{r, fig.height=6, fig.width=12, fig.cap = caption}
+tFreqs %>% 
+  filter(q>0) %>% 
+  ggplot(aes(x=q, fill=mutation)) + 
+    geom_histogram(bins=11) +
+    facet_wrap(~gene) +
+    ggpubr::theme_pubr(base_size = 20) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+caption <- "**Figure 3.** Variant allele in a cohort of 1000 tumors for the s⁺ = 0.1 and s⁻ = -0.25 scenario."
+```
+
+
+
+  
+### Relationship between selection coefficient and pN/pS
+
+
+```{r}
+freqs <- fread(here::here("results","s_freqs_merged.csv"))
+#Limit to 3000 replicates,as some cases could have a couple more of them 
+freqs <- freqs[, head(.SD,3000), by=V1002]
+colnames(freqs) <- c("s", rep("N",500), rep("S",500),"id", rep("kk",4))
+freqs <- data.table::melt(freqs, id.vars = "s", measure.vars = 2:1001, variable.name = "mutation", value.name = "q")
+
+```
+
+```{r}
+t_pNpS_s <- freqs[(s>-1),.(m0=sum(q>0),m01=sum(q>=0.001),m5=sum(q>=0.05),m100=sum(q==1)),by=.(s,mutation)] %>% 
+  dcast(s~mutation, value.var=c("m0","m01","m5","m100")) %>%
+  .[,.(s, pNpS_0 = m0_N/m0_S, pNpS_0.001 = m01_N/m01_S, pNpS_0.05 = m5_N/m5_S, pNpS_1 = m100_N/m100_S)] %>%
+  data.table::melt(id.vars = "s", measure = patterns("^pNpS_"), variable.name="mutations", value.name="pN_pS") 
+setattr(t_pNpS_s[["mutations"]],"levels",c("all", "q >= 0.001", "q >= 0.05", "clonal(q = 1)"))
+```
+
+
+```{r fig.height=6, fig.width=12}
+ p3 <- t_pNpS_s %>% 
+  filter(mutations!="q >= 0.001") %>%
+  ggplot(aes(x=s, y=pN_pS, color=mutations))+
+    #geom_smooth(method = "loess", lwd=2, se=FALSE)+
+    geom_line(lwd=1.2) +
+    geom_point() +
+     ggpubr::theme_pubr(base_size=20)+
+    geom_hline(yintercept = 1, lty="dashed") +
+    geom_vline(xintercept = 0, lty="dashed") +
+   # stat_function(fun=exp_pN_ps, color="cyan") +
+    labs(x="s", y="pN/pS") +
+    #ylim(c(0,2)) +
+    xlim(c(-1,2)) 
+```
+
+
+```{r}
+p1<-freqs[q>0 & (s==-0.75 | s==-0.05 | s==0 | s==0.05 |  s==0.75 | s== 2)] %>% 
+    ggplot(aes(x=q, fill=mutation)) + 
+    geom_histogram(bins=21) +
+    ggpubr::theme_pubr(base_size = 20) +
+    facet_grid(s ~., scales = "free_y") +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    labs(subtitle="all mutations")
+p2<-freqs[q>0.05 & (s==-0.75 | s==-0.05 | s==0 | s==0.05 | s==0.75 | s== 2)] %>% 
+    ggplot(aes(x=q, fill=mutation)) + 
+    geom_histogram(bins=21) +
+    ggpubr::theme_pubr(base_size = 20) +
+    facet_grid(s ~., scales = "free_y") +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    labs(subtitle="mutations with q>=0.05")
+pmuts <- ggpubr::ggarrange(p1,p2, common.legend = TRUE, legend = "top" )
+
+```
+
+```{r, fig.height=25, fig.width=12, fig.cap=caption}
+caption <- "**Figure 4.** A. Relationship between selection coefficient (s) and pN/pS using different kinds of mutations defined by their frequency in the whole tumor. B. Distribution of the mutation frequencies when considering all the mutations in the tumor or just those present in at least 5% of the cells. Different row panels show different selection coefficient for the non-synomous (N) mutations."
+#text.p <- ggpubr::ggparagraph(text = caption, face = "italic", size = 14, color = "black",)
+
+ggpubr::ggarrange(p3, pmuts, nrow = 2,heights = c(5,16),labels = c("A","B")) 
+
+```
+
+
+
+
+```{r}
+dcast(t_pNpS_s,s~mutations) %>%
+  kableExtra::kable(digits = 2) %>%
+  kableExtra::kable_styling(full_width = FALSE,)
+
+```
+
+
+### Behaviour of pN/ps across time in the tumor progression
+
+** SIMULATIONS IN PREPARATION **
+
+
+## Discussion
+
+[...]
+ 
+## Aknowledgments
+
+[...]
+  
+## References
+Diaz-Uriarte, R., 2017. OncoSimulR: Genetic simulation with arbitrary epistasis and mutator genes in asexual populations. Bioinformatics 33, 1898–1899. https://doi.org/10.1093/bioinformatics/btx077  
+  
+Kryazhimskiy, S., Plotkin, J.B., 2008. The population genetics of dN/dS. PLoS Genetics 4. https://doi.org/10.1371/journal.pgen.1000304
+  
+Martincorena, I., Raine, K.M., Gerstung, M., Dawson, K.J., Haase, K., Van Loo, P., Davies, H., Stratton, M.R., Campbell, P.J., 2017. Universal Patterns of Selection in Cancer and Somatic Tissues. Cell 171, 1029–1041. https://doi.org/10.1016/j.cell.2017.09.042  
+  
+McFarland, C.D., Korolev, K.S., Kryukov, G.V., Sunyaev, S.R., Mirny, L.A., 2013. Impact of deleterious passenger mutations on cancer progression. Proc. Natl. Acad. Sci. 110, 2910–2915. https://doi.org/10.1073/pnas.1213968110  
+  
+Yang, Z., Bielawski, J.P., 2000. Statistical methods for detecting molecular adaptation. Trends Ecol. Evol. 15, 496–503.  
+  
+
