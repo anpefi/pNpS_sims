@@ -1,0 +1,291 @@
+---
+title: "Analysis throrough time"
+output:
+  html_notebook: 
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 10
+    highlight: tango
+    theme: readable
+---
+```{r setup, include=FALSE, message=FALSE}
+library(tidyverse, quietly = T, warn.conflicts = FALSE)
+library(data.table)
+library(extrafont)
+library(gridExtra)
+library(latex2exp)
+knitr::opts_chunk$set(message = FALSE, warning=FALSE, cache = FALSE,
+                      fig.path="figures/", dev=c('png', 'pdf'),
+                      echo = FALSE, fig.height = 12, fig.width = 16)
+knitr::opts_knit$set(eval.after = "fig.cap")
+caption <- "generic caption"
+```
+
+```{r load_data}
+# Get the new data in files time_s_pos_XX_pY.{result|freqs}.csv and combine them
+# in a big data.table
+freq_files <- list.files(path = here::here("results"), pattern='time_s_pos_.*_p.*freqs',full.names = TRUE)
+res_files <- list.files(path = here::here("results"), pattern='time_s_pos_.*_p.*result',full.names = TRUE)
+
+hrep <- str_extract(res_files,'_p[0-9]*\\.') %>% parse_number()
+dt_res <- rbindlist(setNames(lapply(res_files, fread, select = c(29,35 ,34, 23, 27), col.names = c("s", "rep","threshold_size","true_size","time") ), hrep), idcol = "hrep")
+hrep <- str_extract(res_files,'_p[0-9]*\\.') %>% parse_number()
+dt_freq <- rbindlist(setNames(lapply(freq_files, fread, col.names = c(rep("N",500), rep("S",500),"id", "s", rep("kk",4), "threshold_size", "rep")), hrep), idcol = "hrep")
+
+# Combine datatables
+full_data <- dt_res[dt_freq, on= c("s","hrep","rep","threshold_size")]
+
+#Clean data
+full_data <- full_data[,-c("id", "kk", "kk.1", "kk.2", "kk.3")]
+full_data[,threshold_size := log10(threshold_size)]
+full_data[,true_size := log10(true_size)]
+full_data[,rep := as.numeric(factor(paste(hrep,rep,sep="_"))),by=s]
+rm(list = c("dt_freq","dt_res"))
+```
+
+```{r}
+# Number of replicates
+ full_data[,.N,by=c("s","threshold_size")] %>% dcast(s ~ threshold_size, value.var="N")
+```
+
+
+```{r}
+cohort_size <- 100
+time_points <- 6 
+# Remove incomplete replicates
+wdt <-  full_data[threshold_size<=(time_points+1)][,full_rep := .N>=time_points, by=c("s","rep")]
+rm(full_data)
+wdt[, rel_time := time - .SD[1,time], by=c("s","rep")]
+wdt <- wdt[which(full_rep==TRUE)]
+
+# Some replicates can fail in the last point, remove them
+if(time_points == 7){
+  wdt[, wrong := (.SD[7,time] - .SD[6,time] < 0), by=c("s","rep")]
+  wdt <- wdt[which(wrong==FALSE)]
+} else{
+  wdt[,wrong := FALSE]
+}
+
+
+# Renumber valid replicates
+wdt[, rep := 1:.N, by=c("s","threshold_size")]
+setcolorder(wdt, c("s","rep"))
+
+# Limit to 10K replicates
+wdt <- wdt[rep<=10000]
+# Create cohorts (100 tumors)
+wdt[,cohort := ceiling(rep/cohort_size)]
+
+# discard incomplete cohorts
+wdt[, full_cohort := .N==cohort_size, by=c("s","cohort", "threshold_size")]
+wdt <- wdt[full_cohort == TRUE,][,c("full_cohort","hrep","full_rep","wrong") := NULL]
+
+
+#Calculate relative time (relative to N=10^2)
+setcolorder(wdt, c("s","cohort", "rep", "threshold_size", "true_size", "time", "rel_time"))
+
+```
+
+```{r}
+wdt[,.(cohorts=max(cohort)),by=c("s")] 
+```
+
+
+
+```{r}
+#clonal, replicate by replicate, then summarizing by cohort
+clonal <- wdt[,.(s, cohort, rep, threshold_size, true_size, time, rel_time, Nmuts= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}), Smuts= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}))][, .(true_size=mean(true_size), rel_time=mean(rel_time, na.rm = T), Nmuts = mean(Nmuts), Smuts = mean(Smuts)), by = c("s","cohort","threshold_size")][,pNpS := Nmuts/Smuts]
+
+```
+
+```{r}
+#clonal, replicate by replicate, then summarizing by cohort
+segregating <- wdt[,.(s, cohort, rep, threshold_size, true_size, time, rel_time, Nmuts= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>=0.05)}), Smuts= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>=0.05)}))][, .(true_size=mean(true_size), rel_time=mean(rel_time, na.rm = T), Nmuts = mean(Nmuts), Smuts = mean(Smuts)), by = c("s","cohort","threshold_size")][,pNpS := Nmuts/Smuts]
+
+```
+
+```{r}
+#clonal, replicate by replicate, then summarizing by cohort
+all <- wdt[,.(s, cohort, rep, threshold_size, true_size, time, rel_time, Nmuts= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0)}), Smuts= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0)}))][, .(true_size=mean(true_size), rel_time=mean(rel_time, na.rm = T), Nmuts = mean(Nmuts), Smuts = mean(Smuts)), by = c("s","cohort","threshold_size")][,pNpS := Nmuts/Smuts]
+
+```
+
+
+## Behaviour of pN/ps across time in the tumor progression
+
+```{r  fig.height=6, fig.width=10}
+timeplot <- clonal %>%
+  ggplot(aes(y=(rel_time), x = threshold_size, color=as.factor(s) )) +
+    geom_point(aes(group=interaction(cohort,s)),size=0.5,alpha=0.2) +
+    stat_summary(fun.y = "mean", geom="line", lwd=1.5) +
+    ggpubr::theme_pubr(base_size=20) +
+    labs(color="s",x="log10(tumor size)", y="time")
+timeplot
+```
+
+
+
+```{r}
+panA <- all %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{A.} $N_{\\lbrack 0,1\\rbrack}$")) +
+    theme(plot.title = element_text(face = "bold", size=14))
+  
+panB <- all %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none", ) +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{B.} $S_{\\lbrack 0,1\\rbrack}$"))  +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+panC <- all %>%
+  ggplot(aes(x=as.factor(threshold_size), y=pNpS, color=as.factor(s))) + 
+    # geom_point(size=0.5,alpha=0.5) +
+    stat_boxplot(outlier.size=0.3) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{C.} $pN/pS_{\\lbrack 0,1\\rbrack}$"))  +
+    geom_hline(yintercept = 1, lty="dashed") +
+    ylim(c(0,50)) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+panD <- segregating %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{D.} $N_{\\lbrack 0.05,1\\rbrack}$"))  +
+    theme(plot.title = element_text(face = "bold", size=14))
+  
+panE <- segregating %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{E.} $S_{\\lbrack 0.05,1\\rbrack}$")) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+panF <- segregating %>%
+  ggplot(aes(x=as.factor(threshold_size), y=pNpS, color=as.factor(s))) + 
+    # geom_point(size=0.5,alpha=0.5) +
+    stat_boxplot(outlier.size=0.3) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{F.} $pN/pS_{\\lbrack 0.05,1\\rbrack}$")) +
+    geom_hline(yintercept = 1, lty="dashed") +
+    ylim(c(0,100)) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+panG <- clonal %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{G.} $N_{\\lbrack 1,1\\rbrack}$")) +
+    theme(plot.title = element_text(face = "bold", size=14))
+  
+panH <- clonal %>%
+  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
+     geom_point(size=0.5,alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
+    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{H.} $S_{\\lbrack 1,1\\rbrack}$")) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+panI <- clonal %>%
+  ggplot(aes(x=as.factor(threshold_size), y=pNpS, color=as.factor(s))) + 
+    # geom_point(size=0.5,alpha=0.5) +
+    stat_boxplot(outlier.size=0.3) +
+    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    ggpubr::theme_pubr(base_size=16, legend = "none") +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{I.} $pN/pS_{\\lbrack 1,1\\rbrack}$")) +
+    geom_hline(yintercept = 1, lty="dashed") +
+    ylim(c(0,50)) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+
+
+```
+
+```{r fig.height=13, fig.width=12}
+
+ggpubr::ggarrange(panA,panB,panC,panD,panE,panF,panG,panH,panI, ncol=3, nrow=3, widths = c(2,2,6), common.legend = T,align = "hv")
+```
+
+
+# Frequency distribution
+
+```{r}
+for(j in seq_along(wdt)[8:1007]){
+         set(wdt, i=which(wdt[[j]]==0), j=j, value=NA)
+}
+```
+
+```{r}
+freqs_time <- wdt %>% data.table::melt(id.vars = c("s", "cohort",  "rep", "threshold_size"), 
+                                       measure.vars = patterns("^N","^S"), value.name = c("N","S"), variable.name="pos", na.rm=T ) %>%
+                      data.table::melt(id.vars = c("s", "cohort","threshold_size"), 
+                                       measure.vars = c("N","S"), value.name = "q", variable.name="mutation", na.rm=T )
+```
+
+```{r fig.height=8, fig.width=10}
+freqs_time[q>0.0005] %>% 
+   ggplot(aes(x=q, fill=mutation)) + 
+  geom_histogram(bins=21) + 
+    facet_grid( s~ threshold_size, scales = "free",) 
+```
+
+
+
+```{r}
+freq_thr <- 0.05
+get_q_pNpS_table <- function(freq_thr){
+  freqs_time[, .(m = sum(q >= freq_thr)), by = .(s, threshold_size, mutation,  cohort)] %>%
+    dcast(s + threshold_size ~ mutation, value.var = "m") %>%
+    .[, .(s, t = log10(t), q = freq_thr, N, S, pNpS = N / S)] 
+}
+
+f <- c(1e-9,0.001, 0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1)
+t_q_pNpS <- do.call( rbind, lapply(f, get_q_pNpS_table))
+```
+
+```{r}
+distr_q <- freqs_time[,.(very_low = sum(q>0.00001), low = sum(q>=0.00001 & q<0.05), intermediate = sum(q>=0.05 & q<0.95), fixed = sum(q>=0.95)), by=c("s","cohort","threshold_size","mutation")][,lapply(.SD,mean),by=c("s","threshold_size","mutation")] %>% data.table::melt(id.vars=c("s","threshold_size","mutation"), measure.vars = c("very_low","low","intermediate","fixed"), variable.name="frequency", value.name="average")
+```
+
+
+```{r fig.height=12, fig.width=10}
+ freqs_time  %>% 
+  ggplot(aes(x=q, fill=mutation)) + 
+  geom_histogram(bins=21) +
+  #ggpubr::theme_pubr(base_size = 20) +
+  facet_grid( threshold_size ~ s, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(subtitle="all mutations")
+```
+
+
+```{r}
+freqs_time[s==0.1]  %>% 
+  ggplot(aes(x=as.factor(threshold_size), color=mutation)) + 
+  geom_jitter(aes(y=q), size=0.5, alpha=0.5) +
+  ggpubr::theme_pubr(base_size = 20) +
+ # facet_grid( threshold_size ~ ., scales = "free_y") +
+  #theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(subtitle="all mutations")
+```
+
+

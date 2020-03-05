@@ -1,0 +1,179 @@
+---
+title: "Supplementary Figures"
+output: html_notebook
+---
+
+```{r}
+library(data.table)
+library(tidyverse)
+```
+
+
+```{r}
+plotVAF <- function(dt) {
+  q <- dt[1:100, 1:3000] %>% as.matrix %>% as.numeric
+  spos <- dt[1,3002]
+  sneg <- dt[1,3003]
+  nq <- 100
+  tFreqs <- data.frame(
+    q = q,
+    gene = factor(
+      c(
+        rep("driver", nq * 1000),
+        rep("deletereous", nq * 1000),
+        rep("neutral", nq * 1000)
+      ),
+      levels = c("driver", "neutral", "deletereous")
+    ),
+    mutation = factor(c(
+      rep("N", nq * 500),
+      rep("S", nq * 500),
+      rep("N", nq * 500),
+      rep("S", nq * 500),
+      rep("N", nq * 500),
+      rep("S", nq * 500)
+    ),
+    levels = c("N", "S"))
+  )
+  examplePNPS <-
+    as.data.table(tFreqs)[q > 0, .N, by = c("gene", "mutation")] %>%
+    dcast(gene ~ mutation) %>%
+    mutate(pNpSall = N / S) %>%
+    select(gene, pNpSall) %>%
+    left_join(
+      as.data.table(tFreqs)[q > 0.05, .N, by = c("gene", "mutation")] %>%
+        dcast(gene ~ mutation) %>%
+        mutate(pNpSdet = N / S) %>%
+        select(gene, pNpSdet)
+    ) %>%
+    left_join(
+      as.data.table(tFreqs)[q == 1, .N, by = c("gene", "mutation")] %>%
+        dcast(gene ~ mutation) %>%
+        mutate(pNpSclon = N / S) %>%
+        select(gene, pNpSclon)
+    )
+  tFreqs %>%
+    filter(q > 0) %>%
+    ggplot(aes(x = q, fill = mutation)) +
+    geom_histogram(bins = 11) +
+    
+    facet_wrap( ~ gene) +
+    
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 30000,
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{\\lbrack 0,1\\rbrack}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 30000,
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSall)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 26000,
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{\\lbrack 0.05,1\\rbrack}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 26000,
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSdet)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 22000,
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{\\lbrack 1,1\\rbrack}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 22000,
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSclon)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    
+    labs(
+      x = "Frequency",
+      y = "ocurrences in cohort",
+      color = "mutation type",
+      title=latex2exp::TeX(paste0("$s^+ = ",spos,"$, $s^- = ",sneg,"$"))
+      
+    ) +
+    ggpubr::theme_pubr(base_size = 18) +
+    theme(axis.text.x = element_text(
+      angle = 45,
+      vjust = 1,
+      hjust = 1
+    ))
+}
+```
+
+```{r warning=F, fig.width=14, fig.height=20}
+#s_pos = 0.1
+freq_files <- c(here::here("results/McF_30.freqs.csv"),here::here("results/McF_31.freqs.csv"),here::here("results/McF_32.freqs.csv"),here::here("results/McF_34.freqs.csv"),here::here("results/McF_33.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF()}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
+
+```{r warning=F, fig.width=14, fig.height=20}
+#s_pos = 0.5
+freq_files <- c(here::here("results/McF_10.freqs.csv"),here::here("results/McF_11.freqs.csv"),here::here("results/McF_12.freqs.csv"),here::here("results/McF_14.freqs.csv"),here::here("results/McF_13.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF()}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
+
+```{r warning=F, fig.width=14, fig.height=20}
+#s_pos = 1
+freq_files <- c(here::here("results/McF_20.freqs.csv"),here::here("results/McF_21.freqs.csv"),here::here("results/McF_22.freqs.csv"),here::here("results/McF_24.freqs.csv"),here::here("results/McF_23.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF()}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
+
+```{r warning=F, fig.width=14, fig.height=20}
+#s_pos = 2
+freq_files <- c(here::here("results/McF_40.freqs.csv"),here::here("results/McF_41.freqs.csv"),here::here("results/McF_42.freqs.csv"),here::here("results/McF_44.freqs.csv"),here::here("results/McF_43.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF()}), common.legend = TRUE, legend = "top", ncol = 1 )
+```

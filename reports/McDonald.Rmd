@@ -1,0 +1,41 @@
+---
+title: "McDonald-Kreitman"
+output: html_notebook
+---
+
+```{r}
+#clonal, replicate by replicate, then summarizing by cohort
+clonal <- wdt[,.(s, cohort, rep, threshold_size, true_size, time, rel_time, Nmuts= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}), Smuts= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}))][, .(true_size=mean(true_size), rel_time=mean(rel_time, na.rm = T), Nmuts = mean(Nmuts), Smuts = mean(Smuts)), by = c("s","cohort","threshold_size")][,dNdS := Nmuts/Smuts]
+
+```
+
+```{r}
+#clonal, replicate by replicate, then summarizing by cohort
+mutations_table <- wdt[,.(s, cohort, rep, threshold_size,  
+                          Npol= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0 & X<1)}), 
+                          Spol= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0 & X<1)}),
+                          Nfix= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}), 
+                          Sfix= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}))
+                       ][, .(Nfix = sum(Nfix), Sfix = sum(Sfix),Npol = sum(Npol), Spol = sum(Spol)), by = c("s","cohort","threshold_size")
+                        ][,pNpS := Npol/Spol
+                        ][,dNdS := Nfix/Sfix
+                        ][,alpha := 1-pNpS/dNdS
+                        ]
+mutations_table[,pvalue := apply(mutations_table[,.(Npol,Spol,Nfix,Sfix)],1,function(X) fisher.test(matrix(X,nr=2,byrow = T))$p.value)]
+
+```
+
+
+```{r fig.height=6,fig.width=10, dev=c('png','pdf')}
+mutations_table %>%
+  ggplot(aes(x=as.factor(threshold_size), y=alpha, color=as.factor(s))) + 
+    stat_boxplot(outlier.size=0.3) +
+    ggpubr::theme_pubr(base_size=20) +
+    labs(y=expression(alpha), x=latex2exp::TeX("log_{10}(cells)"), color="      s")  +
+    geom_hline(yintercept = 1, lty="dashed") +
+    geom_hline(yintercept = 0, lty="dashed") +
+    ylim(c(-15,1)) +
+    theme(plot.title = element_text(face = "bold", size=14))
+
+```
+
