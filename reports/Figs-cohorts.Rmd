@@ -1,0 +1,222 @@
+---
+title: 'Figures using cohorts'
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output:
+  html_notebook: 
+    fig_caption: yes
+    fig_height: 7
+    fig_width: 10
+    highlight: tango
+    theme: readable
+ 
+---
+```{r setup, include=FALSE, message=FALSE}
+library(tidyverse, quietly = T, warn.conflicts = FALSE)
+library(data.table)
+library(extrafont)
+library(gridExtra)
+knitr::opts_chunk$set(message = FALSE, warning=FALSE, cache = FALSE,
+                      fig.path="figures/", dev=c('png', 'pdf'),
+                      echo = FALSE, fig.height = 12, fig.width = 16)
+knitr::opts_knit$set(eval.after = "fig.cap")
+caption <- "generic caption"
+```
+
+```{r load_data, include=FALSE}
+csize <- 100 #max cohort size
+files <- list.files(path = here::here("results"), pattern = "McF.*\\.result\\.csv", full.names = T)
+big_table <- lapply(files, read_csv) %>% bind_rows() %>% filter(!is.na(s_pos), s_neg>=-1) %>% as.data.table
+```
+
+```{r}
+big_table[,rep := 1:.N, by=c("s_pos","s_neg")]
+big_table[,cohort := ceiling(rep/csize)]
+```
+
+
+```{r}
+# Progression plot
+prog_data <-big_table[rep<=3000 & s_pos>0,.(Time, tumor_size, n_clones, largest_clone),by=c("s_pos","s_neg","cohort")] 
+mean_prog <- prog_data[,lapply(.SD, mean), by=c("s_pos")]
+```
+
+```{r fig.height=4, fig.width=4}
+
+prog_data %>% ggplot(aes(x=log10(Time),y=n_clones, color=as.factor(s_pos)))+
+  geom_point(alpha=0.1,size=0.05,aes(fill=as.factor(s_pos)), show.legend = F) +
+  geom_point(data = mean_prog, size=2, aes(fill=as.factor(s_pos)), color="black", pch=21,show.legend = F ) +
+  stat_ellipse(type="t",show.legend = F, size=1.2) +
+  #geom_point(alpha=0.2, size=0.2) +
+  ggpubr::theme_pubr(base_size = 20)+
+     # geom_hline(yintercept = 1, lty="dashed") +
+      labs(x="Time", y="Clones", color="      s+", title="tit") +
+      ylim(c(-0,12))+
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+      theme(plot.title = element_text(face = "bold", size=14))
+  
+```
+
+```{r fig-prog, fig.height=8, fig.width=16, fig.cap=caption}
+
+fp1 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=log10(Time), color=as.factor(s_neg))) +
+    geom_boxplot(outlier.size=0.3) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "bottom") +
+    labs(y="logartimic time", x="s+", color="      s-", subtitle = "Progression time")
+fp2 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=n_clones)) +
+    geom_boxplot(outlier.size=0.3, fill = "Gray85") +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+  
+    theme(legend.position = "none") +
+    ylim(c(0,10)) +
+    labs(y="number of clones", x="s+", color="      s-", subtitle = "Number of clones")
+fp3 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=largest_clone)) +
+    geom_boxplot(outlier.size=0.3, fill = "Gray85") +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "none") +
+    ylim(c(0,1)) +
+    labs(y="proportion of tumor size", x="s+", color="      s-", subtitle = "Largest clone")
+
+
+ggpubr::ggarrange(fp1,fp2,fp3, nrow=1, legend = "bottom", common.legend = TRUE)
+
+caption <- "Parameters obtained at the end of the tumor progression for the different scenarios. Growth time represents the time, in decimal logarithmic scale, that the tumor took to reach the size of $10^7$ cells. The number of clones indicates the final number of clones present in the tumor, considering as clones the different genotypes with positive mutations present. The largest clone shows the proportion of the size of the tumor that occupies the majority clone."
+```
+
+```{r fig-prog2, fig.height=8, fig.width=16, fig.cap=caption}
+
+fp1 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=log10(Time), color=as.factor(s_neg))) +
+    geom_boxplot(outlier.size=0.3) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "bottom") +
+    labs(y="logartimic time", x="s+", color="      s-", subtitle = "Progression time")
+fp2 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=n_clones, color=as.factor(s_neg))) +
+    geom_boxplot(outlier.size=0.3) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+  
+    theme(legend.position = "none") +
+    ylim(c(0,10)) +
+    labs(y="number of clones", x="s+", color="      s-", subtitle = "Number of clones")
+fp3 <-prog_data %>%
+  ggplot(aes(x=as.factor(s_pos),y=largest_clone, color=as.factor(s_neg))) +
+    geom_boxplot(outlier.size=0.3) +
+    ggpubr::theme_pubr(base_size = 20)+
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.47)) +
+    theme(legend.position = "none") +
+    ylim(c(0,1)) +
+    labs(y="proportion of tumor size", x="s+", color="      s-", subtitle = "Largest clone")
+
+
+ggpubr::ggarrange(fp1,fp2,fp3, nrow=1, legend = "bottom", common.legend = TRUE)
+
+caption <- "Parameters obtained at the end of the tumor progression for the different scenarios. Growth time represents the time, in decimal logarithmic scale, that the tumor took to reach the size of $10^7$ cells. The number of clones indicates the final number of clones present in the tumor, considering as clones the different genotypes with positive mutations present. The largest clone shows the proportion of the size of the tumor that occupies the majority clone."
+```
+
+```{r}
+cohort_table <- big_table[rep<=3000 & s_pos>0, 
+                          .(N_driver=sum(N_driver), S_driver=sum(S_driver),N_neutral=sum(N_neutral), S_neutral=sum(S_neutral),N_deletereous=sum(N_deletereous), S_deletereous=sum(S_deletereous),
+                            sp_N_driver=sum(sp_N_driver), sp_S_driver=sum(sp_S_driver), sp_N_neutral=sum(sp_N_neutral), sp_S_neutral=sum(sp_S_neutral),sp_N_deletereous=sum(sp_N_deletereous), sp_S_deletereous=sum(sp_S_deletereous),
+                            cl_N_driver=sum(cl_N_driver), cl_S_driver=sum(cl_S_driver),cl_N_neutral=sum(cl_N_neutral), cl_S_neutral=sum(cl_S_neutral),cl_N_deletereous=sum(cl_N_deletereous), cl_S_deletereous=sum(cl_S_deletereous)),by=c("s_pos","s_neg","cohort") ]
+```
+
+```{r}
+cohort_table[,`:=`(pNpS_driver=N_driver/S_driver, pNpS_neutral=N_neutral/S_neutral, pNpS_deletereous=N_deletereous/S_deletereous)]
+cohort_table[,`:=`(sp_pNpS_driver=sp_N_driver/sp_S_driver, sp_pNpS_neutral=sp_N_neutral/sp_S_neutral, sp_pNpS_deletereous=sp_N_deletereous/sp_S_deletereous)]
+cohort_table[,`:=`(cl_pNpS_driver=cl_N_driver/cl_S_driver, cl_pNpS_neutral=cl_N_neutral/cl_S_neutral, cl_pNpS_deletereous=cl_N_deletereous/cl_S_deletereous)]
+cohort_table[,lapply(.SD, mean), by=c("s_pos","s_neg")]
+```
+
+
+```{r}
+pnps_table <- cohort_table[,.(pNpS_driver,pNpS_neutral,pNpS_deletereous,sp_pNpS_driver,sp_pNpS_neutral,sp_pNpS_deletereous,cl_pNpS_driver,cl_pNpS_neutral,cl_pNpS_deletereous), by=c("s_pos","s_neg")] %>% melt(id.vars = c("s_pos","s_neg"), value.name="pN_pS")
+```
+```{r fig.height=10, fig.width=12}
+tit <- "prueba"
+y1=0
+y2=2
+pnps_table %>% filter(variable=="pNpS_deletereous") %>%
+  ggplot(aes(x=as.factor(s_neg),y=pN_pS, color=as.factor(s_pos)))+
+  stat_boxplot(outlier.size=0.3) +
+  stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s_pos)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s_pos)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+      ggpubr::theme_pubr(base_size = 20)+
+      geom_hline(yintercept = 1, lty="dashed") +
+      labs(y="pN/pS", x="s-", color="      s+", title=tit) +
+     ylim(c(y1,y2))+
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+      theme(plot.title = element_text(face = "bold", size=14))
+  
+  
+```
+
+
+
+```{r fig-pnps, fig.height=15, fig.width=14, fig.cap=caption}
+ind_plot <- function(X,y1=0,y2=2, tit){
+  X %>%
+   ggplot(aes(x=as.factor(s_pos),y=pN_pS, color=as.factor(s_neg)))+
+  stat_boxplot(outlier.size=0.3) +
+ # stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s_pos)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s_pos)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+      ggpubr::theme_pubr(base_size = 20)+
+      geom_hline(yintercept = 1, lty="dashed") +
+      labs(y="pN/pS", x="s+", color="      s-", title=tit) +
+     ylim(c(y1,y2))+
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+      theme(plot.title = element_text(face = "bold", size=18))
+  
+  
+}
+
+tit.lab=c(TeX('A. Driver gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
+                          TeX( 'B. Neutral gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
+                          TeX( 'C. Deletereous gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
+                          TeX( 'D. Driver gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
+                          TeX( 'E. Neutral gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
+                          TeX( 'F. Deletereous gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
+                          TeX( 'G. Driver gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'),
+                          TeX( 'H. Neutral gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'),
+                          TeX( 'I. Deletereous gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'))
+
+f1 <- pnps_table %>% filter(variable=="pNpS_driver") %>% ind_plot(y1=0,y2=2, tit.lab[1])
+f2 <- pnps_table %>% filter(variable=="pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[2])
+f3 <- pnps_table %>% filter(variable=="pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[3])
+f4 <- pnps_table %>% filter(variable=="sp_pNpS_driver") %>% ind_plot(y1=0,y2=60, tit.lab[4])
+f5 <- pnps_table %>% filter(variable=="sp_pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[5])
+f6 <- pnps_table %>% filter(variable=="sp_pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[6])
+f7 <- pnps_table %>% filter(variable=="cl_pNpS_driver") %>% ind_plot(y1=0,y2=60, tit.lab[7])
+f8 <- pnps_table %>% filter(variable=="cl_pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[8])
+f9 <- pnps_table %>% filter(variable=="cl_pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[9])
+
+ggpubr::ggarrange(f1,f2,f3, f4, f5,f6,f7,f8,f9, 
+                  nrow = 3, ncol=3, common.legend = TRUE, heights = c(4,4,4)
+                 )
+
+caption <- "Average pN/pS, considering all the mutations present in the tumor, for each of the three genes (driver, neutral and deletereous) in all the scenarios simulated for the different positive ($s^+$, color lines) and negative ($s^-$, x-axis) selection coefficient. A.B,C show the pN/pS calculated using all the simulations present in the tumot. D, E, F using only those mutations above the threshold frequency of 0.05. G, H, I use only the clonal mutations for the tumor, those present in all the cells.
+"
+```
+
+
+
+
+```{r make-prog-data}
+prog_data <- big_table %>%
+  filter(s_pos>0) %>%
+  group_by(s_pos,s_neg) %>% 
+  mutate(cohort=rep(1:n(),each=csize)[1:n()]) %>% 
+  group_by(cohort,add = T) %>%
+  group_by(s_pos,s_neg) %>% 
+  select(s_pos, s_neg, Time, tumor_size, n_clones, largest_clone, w_total) %>%
+  summarise_all(mean) 
+  
+```
