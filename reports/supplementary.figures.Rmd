@@ -55,7 +55,9 @@ plotVAF <- function(dt) {
   tFreqs %>%
     filter(q > 0) %>%
     ggplot(aes(x = q, fill = mutation)) +
-    geom_histogram(bins = 11) +
+    geom_bar(position = "stack") +
+    scale_x_binned(breaks = seq(0.05,0.95, by = 0.05),
+                   labels = c(".05","",".15","",".25","",".35","",".45","",".55","",".65","",".75","",".85","",".95"))+
     
     facet_wrap( ~ gene) +
     
