@@ -1,0 +1,435 @@
+---
+title: 'Comparing simulators: OncoSimulR vs. SLiM'
+author: "Andrés Pérez-Figueroa"
+date: "18/06/2019"
+output:
+  html_notebook:
+    fig_caption: yes
+    fig_height: 10
+    fig_width: 10
+    highlight: tango
+    theme: readable
+---
+
+```{r setup, include=FALSE, message=FALSE}
+library(tidyverse, quietly = T, warn.conflicts = FALSE)
+library(extrafont)
+library(gridExtra)
+knitr::opts_chunk$set(message = FALSE, warning=FALSE, cache = FALSE,
+                      echo = FALSE, fig.height = 12, fig.width = 16)
+knitr::opts_knit$set(eval.after = "fig.cap")
+caption <- "generic caption"
+```
+
+# The problem
+
+When analyzing the relationship between pN/pS and s using OncoSimulR simulations with only one type of non-synonymous mutations (positive or negative) I noted a estrange plateau in pN/pS in the negative selected mutations: 
+
+```{r}
+# Loading data from OncoSimulR
+files_s <- list.files(path = here::here("results"), pattern = "s_.*\\.result\\.csv", full.names = T)
+big_table_s <- lapply(files_s, read_csv) %>% bind_rows() %>% filter(!is.na(s_pos), s_neg>=-1)
+```
+
+
+```{r}
+oncosimulr <- big_table_s %>%
+  mutate(s=s_pos) %>% 
+  group_by(s) %>%
+  summarize(N=mean(N_driver, na.rm=T), S=mean(S_driver, na.rm = T), 'pN/pS'=mean(N_driver, na.rm=T)/mean(S_driver, na.rm = T))
+```
+
+```{r fig.height=5, fig.width=10}
+oncosimulr %>%
+  ggplot(aes(x=s,y=`pN/pS`)) +
+    geom_line(color="red", lwd=1.5) +
+    geom_point() +
+    theme_bw(base_size=28) +
+    geom_hline(yintercept = 1, lty="dashed") +
+    geom_vline(xintercept = 0, lty="dashed") +
+    labs(x="s", y="pN/pS") +
+    ylim(c(0,2)) +
+    xlim(c(-1,2))
+
+```
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+Looking for further details on the mutations, I've found that the number of synonymous mutations at the end of the runs was weirdly correlated with the selection coefficient. 
+
+<p>  <br />  <br /> </p>
+
+```{r}
+oncosimulr %>% filter(s <= 0) %>%
+ kableExtra::kable(digits = c(2,3,3,2),align = c("c","c","c","c")) %>%
+ kableExtra::kable_styling(c("stripped","bordered","hover"), full_width = F, font_size = 18 ) %>%
+ kableExtra::column_spec(1, bold = T, border_right = T, border_left = T, width = "5em") %>%
+  kableExtra::column_spec(c(2,3,4),width = "10em", )
+```
+*Mean number of mutations of both types (N and S) per tumor and resulting overall pN/pS ratio for different negative selection coefficients*
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+Looking to the distribution of the number of mutations present in each run, you can see that the cause is that most of the runs have not any mutation at all. That's strange, at least for the S mutations that we could expect found at least as many as in the neutral case (s=0).
+
+```{r, fig.height=10, fig.width=10, fig.cap=caption}
+means_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  group_by(s) %>%
+  summarize(N=mean(N_driver, na.rm=T), S=mean(S_driver, na.rm = T)) %>%
+  gather("mutation","number",N:S)
+
+sums_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  group_by(s) %>%
+  summarize(N=sum(N_driver), S=sum(S_driver)) %>%
+  gather("mutation","number",N:S)
+
+pnps_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  group_by(s) %>%
+  summarize(pnps=sum(N_driver)/sum(S_driver)) %>%
+  select(s,pnps) %>% mutate(mutation="N")
+
+lvls <- c("s = 0","s = -0.01","s = -0.05","s = -0.1","s = -0.25","s = -0.5","s = -0.75","s = -1")
+big_table_s %>%
+  mutate(s=s_pos, N=N_driver, S=S_driver) %>%
+  select(s,N,S) %>%
+  filter(s <= 0) %>%
+  gather("mutation","number",N:S) %>%
+  ggplot(aes( x=number)) +
+    geom_bar() +
+    geom_vline(aes(xintercept = number), data = means_muts, linetype="dashed") +
+    facet_grid(factor(paste0("s = ",s), levels=lvls) ~ mutation, scales="free_y") +
+    theme_bw(base_size=18) +
+    labs(x="number of mutations", y="", title="OncoSimulR unfiltered")
+
+``` 
+*Distribution of the number of mutations of each type (N and S) found in 3000 cell populations for different negative selection coefficients  using simulations by OncoSimulR. The sumatory represent the total number of mutations. Vertical dashed line represents the average number of mutations*
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+One obvious check it was to filter out all runs without any mutation (N+S=0). That left only less than 100 replicates (from the ~3000 original replicates), but at least the average and distribution of S mutations makes some sense now. However, there is still some strange pattern as there are, when s<0, very few replicates with 0 mutations of one of the types (N | S = 0).
+
+
+```{r, fig.height=10, fig.width=10, fig.cap=caption}
+means_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  filter(N_driver+S_driver >0) %>%
+  group_by(s) %>%
+  summarize(N=mean(N_driver, na.rm=T), S=mean(S_driver, na.rm = T)) %>%
+  gather("mutation","number",N:S)
+
+sums_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  filter(N_driver+S_driver >0) %>%
+  group_by(s) %>%
+  summarize(N=sum(N_driver), S=sum(S_driver)) %>%
+  gather("mutation","number",N:S)
+
+pnps_muts <- big_table_s %>%
+  mutate(s=s_pos) %>%
+  filter(s <= 0) %>%
+  filter(N_driver+S_driver >0) %>%
+  group_by(s) %>%
+  summarize(pnps=sum(N_driver)/sum(S_driver), n=n()) %>%
+  select(s,pnps,n) %>% mutate(mutation="N")
+
+lvls <- c("s = 0","s = -0.01","s = -0.05","s = -0.1","s = -0.25","s = -0.5","s = -0.75")
+
+big_table_s %>%
+  mutate(s=s_pos, N=N_driver, S=S_driver) %>%
+  select(s,N,S) %>%
+  filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  gather("mutation","number",N:S) %>%
+  ggplot(aes( x=number)) +
+    geom_bar() +
+    geom_vline(aes(xintercept = number), data = means_muts, linetype="dashed") +
+    #geom_text(aes(x=11, y=70, label=paste0("\u03A3 = ",number)), data=sums_muts, cex=5) +
+    #geom_text(aes(x=11, y=50, label=paste0("n = ",n)), data=pnps_muts, cex=5) +
+    facet_grid(factor(paste0("s = ",s),levels=lvls) ~ mutation, scales = "free_y") +
+    theme_bw(base_size=18) +
+    labs(x="number of mutations", y="", title="OncoSimulR filtered")
+```
+*Distribution of the number of mutations of each type (N and S) found in 3000 populations, but filtering those without mutations, for different negative selection coefficients using simulations by OncoSimulR. The sumatory represent the total number of mutations. n is the number of remaining populations after filtering those without mutations. Vertical dashed line represents the average number of mutations*
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+# SLiM
+
+In order to check if the above results could be due to a problem with the simulator, I repeated the simulations using another simulator, [SLiM 3](https://messerlab.org/slim/). SLiM 3 [(Haller and Messer, 2019)](https://academic.oup.com/mbe/article/36/3/632/5229931) is a new version of the famous evolutionary simulation framework that now allows design simulations beyond the Wright-Fisher model. However it is still a discrete-time simulator so I need to hack the model to make the simulations comparable to those with OncoSimulR.
+
+I approximate the McFarland model used in OncoSimulR by considering the discrete time units as 1/100 of the expected generation time under neutrality. So, the birth rate 
+
+$$b = \frac{(1+s⁺)^{n_{drivers}}}{(1-s⁻)^{n_{deletereous}}}$$
+is the probability of cell division in the generation time (100 time units), and it dependent of the number of mutations present in a cell. This is implemented as a binomial (1,b), with b limited to 1. Then the death rate is 
+
+$$d=\log(1+N/K)$$ 
+that it is also scaled by the generation time (100 time units) and depends only on the actual population size and the *K* equilibrium size (1000 by default). This should behave as the continuous-time McFarland model (but slower) if the number of positive mutations carried by a cell is not big enough to make *b* above 1. In that case the birth rate is too high that such a cell would reproduce all the time units, and adding more mutations cannot make a cell reproduce faster
+
+
+The following is the generic configuration file for SLiM 3 defining the approximation to the McFarland model used in OncoSimulR
+  
+   
+```r
+// cancer model
+
+initialize() {
+  initializeSLiMModelType("nonWF");
+  defineConstant("N0", 1000);
+
+  if(s>0){   //s given as argument
+    defineConstant("s_pos", s);
+    defineConstant("s_neg", 0.0);
+  }
+  else{
+    defineConstant("s_pos", 0.0);
+    defineConstant("s_neg", -s);
+  }
+  defineConstant("T_G", 100.0); // Generation time
+
+  initializeSLiMOptions(mutationRuns=1); //Optimization
+
+  initializeMutationRate(mu); //mu given as argument
+  initializeRecombinationRate(0.0);
+  initializeMutationType("m1", 1, "f", 0.0); // N mutations
+  initializeMutationType("m2", 1  , "f", 0.0); // S mutations
+  m1.mutationStackPolicy = "l";
+  m2.mutationStackPolicy = "l";
+  initializeGenomicElementType("g1", c(m1,m2), c(1,1));
+  initializeGenomicElement(g1, 0, 999);
+}
+
+reproduction() {
+  d=0; p=0; //number of driver and passenger(deletereous) mutations
+  if(s>0) {d = individual.countOfMutationsOfType(m1);}
+  if(s<0) {p = individual.countOfMutationsOfType(m1);}
+  
+  B = (((1+s_pos)^d)/((1+s_neg)^p)) / T_G ; //Following McFarland et al 2013 
+
+  if (B>1.0){B=1.0;}
+  individual.setValue("B",B);
+  if(rbinom(1, 1, B)==1) {
+  p1.addCloned(individual);
+  }
+}
+
+1 early() {
+  //cat("\nt \tn \tN_all \tS_all \tN_sp \tS_sp \tN_cl \tS_cl \n");
+  sim.setValue("Ninds",N0);
+  sim.addSubpop("p1", sim.getValue("Ninds"));
+  sim.rescheduleScriptBlock(s1, start=tmax, end=tmax);
+}
+
+early() {
+ K = N0/(exp(1)-1);
+  if (sim.generation>1) {
+      p1.fitnessScaling =   1.0 -  (log(1.0 + (p1.individualCount / asFloat(K))) / T_G);
+  }
+}
+
+late() {
+  end = F;
+  inds = p1.individuals;
+  if((size(inds) > Nmax) | (sim.generation==tmax)) end = T;  //Nmax and tmax given as argument
+
+  // output
+  //if(sim.generation % (T_G*100) == 0 | end == T){
+  if(end == T){
+    mut = sim.mutations;
+    driver = sim.mutationsOfType(m1);
+    Nmut = sum(mut.mutationType == m1);
+    if(isNULL(Nmut)){Nmut = 0;}
+    Smut = sum(mut.mutationType == m2);
+    if(isNULL(Smut)){Smut = 0;}
+
+    m1_sp = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.025);
+    m2_sp = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.025);
+
+    m1_cl = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m1)) > 0.49);
+    m2_cl = sum(sim.mutationFrequencies(p1, sim.mutationsOfType(m2)) > 0.49);
+
+    //File output
+    outLine = paste(c(asInteger(sim.generation/T_G), end, size(inds), Nmut, Smut,m1_sp,m2_sp,m1_cl,m2_cl),",");
+    if (!writeFile(paste(c(name,".results.csv"),""), outLine, append=T))
+            stop("Error writing file.");
+  }
+  if (end ) {
+    sim.simulationFinished();
+    outLine = paste(c("N",sim.mutationFrequencies(p1, sim.mutationsOfType(m1))),",");
+    outLine2 = paste(c("S",sim.mutationFrequencies(p1, sim.mutationsOfType(m2))),",");
+
+    if (!writeFile(paste(c(name,".freqs.csv"),""), paste(c(outLine,outLine2),"\n"), append=T))
+            stop("Error writing file.");
+  }
+  sim.setValue("Ninds", size(inds));
+}
+
+s1 200000 late(){
+
+}
+
+```
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+Running SLiM simulation to check the behavior of the number of mutations when s <=0.
+
+```{r}
+# Loading data from SLiM
+files_slim <- list.files(path = here::here("results"), pattern = "slim.*\\.results\\.csv", full.names = T)
+cols.slim <- c("t","end","TS","N","S","sp_N","sp_S","cl_N","cl_S")
+read_slim <- function(filename){
+  s <- filename %>%
+          stringr::str_split(pattern = "_",simplify = T) %>%
+          last %>%
+          gsub(".results.csv","",.) %>%
+          as.numeric
+  if(stringr::str_detect(filename,"neg") & s>0) s= -s
+  content <- readr::read_csv(filename,
+                      col_names=c("t","end","TS","N","S","sp_N","sp_S","cl_N","cl_S"),
+                      col_types="iliiiiiii") %>%
+                        dplyr::mutate(s=s)
+}
+big_table_slim <- lapply(files_slim, read_slim)  %>% bind_rows()
+```
+
+```{r, fig.height=10, fig.width=10, fig.cap=caption}
+means_muts <- big_table_slim %>%
+  filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  group_by(s) %>%
+  summarize(N=mean(N, na.rm=T), S=mean(S, na.rm = T)) %>%
+  gather("mutation","number",N:S)
+
+sums_muts <- big_table_slim %>%
+  filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  group_by(s) %>%
+  summarize(N=sum(N), S=sum(S)) %>%
+  gather("mutation","number",N:S)
+
+pnps_muts <- big_table_slim %>%
+  filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  group_by(s) %>%
+  summarize(pnps=sum(N)/sum(S)) %>%
+  select(s,pnps) %>% mutate(mutation="N")
+
+lvls <- c("s = 0","s = -0.01","s = -0.05","s = -0.1","s = -0.25","s = -0.5","s = -0.75","s = -1")
+
+big_table_slim %>%
+  select(s,N,S) %>%
+  filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  gather("mutation","number",N:S) %>%
+  ggplot(aes( x=number)) +
+    geom_bar() +
+    geom_vline(aes(xintercept = number), data = means_muts, linetype="dashed") +
+    # geom_text(aes(x=2, y=130, label=paste0("\u03A3 = ",number)), data=sums_muts, cex=5) +
+    # geom_text(aes(x=2, y=90, label=paste0("pN/pS = ",round(pnps,2))), data=pnps_muts, cex=5) +
+    facet_grid(factor(paste0("s = ",s), levels=lvls) ~ mutation) +
+    theme_bw(base_size=18) +
+    labs(x="number of mutations", y="tumors", title="SLiM filtered")
+```
+*Distribution of the number of mutations of each type (N and S) found in 3000 populations, but filtering those without mutations, for different negative selection coefficients using simulations by SLiM. The sumatory represent the total number of mutations. n is the number of remaining populations after filtering those without mutations. Vertical dashed line represents the average number of mutations*
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+Interestingly, the number of mutations are much lower than for OncoSimulR (that is explained by some difference in modelling mutations). However, although I filtered replicates without mutations, it still appear replicates with 0 mutations of one type, as expected.
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+```{r}
+big_tidy_table <- rbind(
+big_table_slim %>%
+ # filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  group_by(s) %>%
+  summarize(N=round(mean(N),3), S=round(mean(S),3), pnps=round(sum(N)/sum(S),3), reps=n()) %>%
+  mutate(filtertype="filtered",sim="SLiM"),
+big_table_slim %>%
+  #filter(s <= 0) %>%
+  group_by(s) %>%
+  summarize(N=round(mean(N),3), S=round(mean(S),3), pnps=round(sum(N)/sum(S),3), reps=n()) %>%
+  mutate(filtertype="unfiltered",sim="SLiM"),
+big_table_s %>%
+  mutate(s=s_pos, N=N_driver, S=S_driver) %>%
+  #filter(s <= 0) %>%
+  filter(N+S >0) %>%
+  group_by(s) %>%
+  summarize(N=round(mean(N),3), S=round(mean(S),3), pnps=round(sum(N)/sum(S),3), reps=n()) %>%
+  mutate(filtertype="filtered",sim="OncoSimulR"),
+big_table_s %>%
+  mutate(s=s_pos, N=N_driver, S=S_driver) %>%
+  #filter(s <= 0) %>%
+  group_by(s) %>%
+  summarize(N=round(mean(N),3), S=round(mean(S),3), pnps=round(sum(N)/sum(S),3), reps=n()) %>%
+  mutate(filtertype="unfiltered",sim="OncoSimulR")
+)   %>%
+  mutate(filtertype=as.factor(filtertype)) %>%
+select(sim, s, filtertype, N, S, pnps, reps) %>%
+  gather(key="variable",value = "value", N:reps, factor_key = TRUE)
+```
+
+Overall, here is the comparison between the two simulators, filtering or not the replicates without mutations.
+
+```{r, fig.height=12, fig.width=12}
+big_tidy_table %>%
+  filter(s<=0) %>%
+  ggplot(aes(y=factor(s), x=variable)) +
+  geom_tile(fill="white", colour = "black", lwd=0.7) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0, 0)) +
+  theme(plot.margin = unit(0, "lines")) +
+  geom_text(aes(label= value), vjust = 0.6, cex=6) +
+  facet_grid(as.factor(filtertype)~as.factor(sim)) +
+    labs(x="variable",y="s") +
+    theme_bw(base_size = 26) +
+  theme(panel.spacing = unit(1, "lines"), panel.grid = element_blank())
+```
+*Summary of the number of mutations of each type (N and S), pN/pS and number of replicates obtained by the both simulators (OncosimulR and SLiM) when considering replicates with or without no mutations at the end for different negative selection coefficients*
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+```{r, fig.height=10, fig.width=12}
+big_tidy_table %>%
+  filter(s>=0, s !=0.01, filtertype=="unfiltered") %>%
+  mutate(value=round(value,2)) %>%
+  ggplot(aes(y=factor(s), x=variable)) +
+  geom_tile(fill="white", colour = "black", lwd=0.7) +
+  scale_y_discrete(expand = c(0, 0)) +
+  scale_x_discrete(expand = c(0, 0)) +
+  theme(plot.margin = unit(0, "lines")) +
+  geom_text(aes(label= value), vjust = 0.6, cex=6) +
+  facet_grid(~as.factor(sim)) +
+    labs(x="variable",y="s") +
+    theme_bw(base_size = 26) +
+  theme(panel.spacing = unit(1, "lines"), panel.grid = element_blank())
+```
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+Finally, the behavior of the pN/pS ratio across the selection coefficients is quite similar between the both simulator, but there are tow main differences: there is not plateau in pN/pS when s<0 for SLim, and it decreases as s does. And there is  a weir peak in SLiM for s=0.01. 
+
+```{r, fig.height=9, fig.width=12}
+big_tidy_table %>%
+  filter(variable==c("pnps"), filtertype=="filtered", s != 0.01) %>%
+  ggplot(aes(x=(as.numeric(as.character(s))), y=value, color=sim))+
+    #geom_smooth(method = "loess", lwd=2, se=FALSE)+
+    geom_line(lwd=1.5) +
+    geom_point() +
+    theme_bw(base_size=28)+
+    geom_vline(xintercept = 0, lty="dashed") +
+    geom_hline(yintercept = 1, lty="dashed") +
+    labs(x="s", y="pN/pS", title="comparing simulators (filtered replicatesl)")
+```
+
+<p>  <br />  <br />  <br />  <br />  <br /> </p>
+
+**[MORE DISCUSSION TO COME]**
