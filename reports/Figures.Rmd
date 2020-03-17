@@ -1,5 +1,5 @@
 ---
-title: "Figures using cohorts"
+title: "Reproducible report of the figures"
 output:
   html_document:
     df_print: paged
@@ -32,12 +32,13 @@ big_table <- lapply(files, read_csv) %>% bind_rows() %>% filter(!is.na(s_pos), s
 ```{r}
 big_table[,rep := 1:.N, by=c("s_pos","s_neg")]
 big_table[,cohort := ceiling(rep/csize)]
+colnames(big_table) <- colnames(big_table) %>% str_replace("_deletereous","_deleterious")
 ```
 
 
 ```{r}
 # Progression plot
-prog_data <-big_table[rep<=3000 & s_pos>0,.(Time, tumor_size, n_clones, largest_clone),by=c("s_pos","s_neg","cohort")] 
+prog_data <-big_table[rep<=3000 & s_pos>0 & s_neg<0,.(Time, tumor_size, n_clones, largest_clone),by=c("s_pos","s_neg","cohort")] 
 mean_prog <- prog_data[,lapply(.SD, mean), by=c("s_pos")]
 ```
 
@@ -82,71 +83,68 @@ caption <- "Parameters obtained at the end of the tumor progression for the diff
 
 ```{r}
 cohort_table <- big_table[rep<=3000 & s_pos>0, 
-                          .(N_driver=sum(N_driver), S_driver=sum(S_driver),N_neutral=sum(N_neutral), S_neutral=sum(S_neutral),N_deletereous=sum(N_deletereous), S_deletereous=sum(S_deletereous),
-                            sp_N_driver=sum(sp_N_driver), sp_S_driver=sum(sp_S_driver), sp_N_neutral=sum(sp_N_neutral), sp_S_neutral=sum(sp_S_neutral),sp_N_deletereous=sum(sp_N_deletereous), sp_S_deletereous=sum(sp_S_deletereous),
-                            cl_N_driver=sum(cl_N_driver), cl_S_driver=sum(cl_S_driver),cl_N_neutral=sum(cl_N_neutral), cl_S_neutral=sum(cl_S_neutral),cl_N_deletereous=sum(cl_N_deletereous), cl_S_deletereous=sum(cl_S_deletereous)),by=c("s_pos","s_neg","cohort") ]
+                          .(N_driver=sum(N_driver), S_driver=sum(S_driver),N_neutral=sum(N_neutral), S_neutral=sum(S_neutral),N_deleterious=sum(N_deleterious), S_deleterious=sum(S_deleterious),
+                            sp_N_driver=sum(sp_N_driver), sp_S_driver=sum(sp_S_driver), sp_N_neutral=sum(sp_N_neutral), sp_S_neutral=sum(sp_S_neutral),sp_N_deleterious=sum(sp_N_deleterious), sp_S_deleterious=sum(sp_S_deleterious),
+                            cl_N_driver=sum(cl_N_driver), cl_S_driver=sum(cl_S_driver),cl_N_neutral=sum(cl_N_neutral), cl_S_neutral=sum(cl_S_neutral),cl_N_deleterious=sum(cl_N_deleterious), cl_S_deleterious=sum(cl_S_deleterious)),by=c("s_pos","s_neg","cohort") ]
 ```
 
 ```{r}
-cohort_table[,`:=`(pNpS_driver=N_driver/S_driver, pNpS_neutral=N_neutral/S_neutral, pNpS_deletereous=N_deletereous/S_deletereous)]
-cohort_table[,`:=`(sp_pNpS_driver=sp_N_driver/sp_S_driver, sp_pNpS_neutral=sp_N_neutral/sp_S_neutral, sp_pNpS_deletereous=sp_N_deletereous/sp_S_deletereous)]
-cohort_table[,`:=`(cl_pNpS_driver=cl_N_driver/cl_S_driver, cl_pNpS_neutral=cl_N_neutral/cl_S_neutral, cl_pNpS_deletereous=cl_N_deletereous/cl_S_deletereous)]
+cohort_table[,`:=`(pNpS_driver=N_driver/S_driver, pNpS_neutral=N_neutral/S_neutral, pNpS_deleterious=N_deleterious/S_deleterious, pNpS_mix= (N_driver + N_deleterious)/(S_driver + S_deleterious))]
+cohort_table[,`:=`(sp_pNpS_driver=sp_N_driver/sp_S_driver, sp_pNpS_neutral=sp_N_neutral/sp_S_neutral, sp_pNpS_deleterious=sp_N_deleterious/sp_S_deleterious, sp_pNpS_mix= (sp_N_driver + sp_N_deleterious)/(sp_S_driver + sp_S_deleterious))]
+cohort_table[,`:=`(cl_pNpS_driver=cl_N_driver/cl_S_driver, cl_pNpS_neutral=cl_N_neutral/cl_S_neutral, cl_pNpS_deleterious=cl_N_deleterious/cl_S_deleterious, cl_pNpS_mix= (cl_N_driver + cl_N_deleterious)/(cl_S_driver + cl_S_deleterious))]
 cohort_table[,lapply(.SD, mean), by=c("s_pos","s_neg")]
 ```
 
 
 ```{r}
-pnps_table <- cohort_table[,.(pNpS_driver,pNpS_neutral,pNpS_deletereous,sp_pNpS_driver,sp_pNpS_neutral,sp_pNpS_deletereous,cl_pNpS_driver,cl_pNpS_neutral,cl_pNpS_deletereous), by=c("s_pos","s_neg")] %>% melt(id.vars = c("s_pos","s_neg"), value.name="pN_pS")
+pnps_table <- cohort_table[s_neg < 0,.(pNpS_driver,pNpS_neutral,pNpS_deleterious,pNpS_mix, sp_pNpS_driver,sp_pNpS_neutral,sp_pNpS_deleterious,sp_pNpS_mix, cl_pNpS_driver,cl_pNpS_neutral,cl_pNpS_deleterious, cl_pNpS_mix), by=c("s_pos","s_neg")] %>% melt(id.vars = c("s_pos","s_neg"), value.name="pN_pS")
 ```
 
 
 
 
-```{r fig-pnps, fig.height=15, fig.width=14, fig.cap=caption}
+```{r fig-pnps, fig.height=15, fig.width=15}
 ind_plot <- function(X,y1=0,y2=2, tit){
   X %>%
-   ggplot(aes(x=as.factor(s_pos),y=pN_pS, fill=as.factor(s_neg)))+
-  stat_boxplot(outlier.size=1, outlier.color = NA, outlier.shape = 21) +
-    ggsci::scale_fill_nejm() +
- # stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s_pos)),size=0.8, alpha=0.7, position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
-    #stat_summary(fun.y=mean, geom = "point",shape=23, size=1.2, aes(fill=as.factor(s_pos)), color="black", position = position_dodge(width=0.75),show.legend = F, alpha=0.5) +
+    ggplot(aes(x=s_pos, color=as.factor(s_neg)))+
+      geom_line(aes(y=mean)) +
+      geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.02) +
+      ggsci::scale_color_nejm() +
       ggpubr::theme_pubr(base_size = 20)+
       geom_hline(yintercept = 1, lty="dashed") +
-      labs(y="pN/pS", x="s+", fill="      s-", title=tit) +
-     ylim(c(y1,y2))+
+      labs(y=TeX("pN/pS"), x=TeX("$s^+$}"), color=TeX("      $s^-$"), title=tit) +
+      ylim(c(y1,y2))+
       theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
       theme(plot.title = element_text(face = "bold", size=18))
   
   
 }
 
-tit.lab=c(TeX('A. Driver gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
-                          TeX( 'B. Neutral gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
-                          TeX( 'C. Deletereous gene, $pN/pS_{\\lbrack 0,1\\rbrack}$'),
-                          TeX( 'D. Driver gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
-                          TeX( 'E. Neutral gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
-                          TeX( 'F. Deletereous gene, $pN/pS_{\\lbrack 0.05,1\\rbrack}$'),
-                          TeX( 'G. Driver gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'),
-                          TeX( 'H. Neutral gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'),
-                          TeX( 'I. Deletereous gene, $pN/pS_{\\lbrack 1,1\\rbrack}$'))
-
-f1 <- pnps_table %>% filter(variable=="pNpS_driver") %>% ind_plot(y1=0,y2=2, tit.lab[1])
-f2 <- pnps_table %>% filter(variable=="pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[2])
-f3 <- pnps_table %>% filter(variable=="pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[3])
-f4 <- pnps_table %>% filter(variable=="sp_pNpS_driver") %>% ind_plot(y1=0,y2=60, tit.lab[4])
-f5 <- pnps_table %>% filter(variable=="sp_pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[5])
-f6 <- pnps_table %>% filter(variable=="sp_pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[6])
-f7 <- pnps_table %>% filter(variable=="cl_pNpS_driver") %>% ind_plot(y1=0,y2=60, tit.lab[7])
-f8 <- pnps_table %>% filter(variable=="cl_pNpS_neutral") %>% ind_plot(y1=0,y2=2, tit.lab[8])
-f9 <- pnps_table %>% filter(variable=="cl_pNpS_deletereous") %>% ind_plot(y1=0,y2=2, tit.lab[9])
-
-ggpubr::ggarrange(f1,f2,f3, f4, f5,f6,f7,f8,f9, 
+f1 <- pnps_table[variable=="pNpS_driver",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX('I. Driver gene, $pN/pS_{all}$'))
+f2 <- pnps_table[variable=="pNpS_neutral",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX('G. Neutral gene, $pN/pS_{all}$'))
+f3 <- pnps_table[variable=="pNpS_deleterious",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX( 'H. Deleterious gene, $pN/pS_{all}$'))
+f4 <- pnps_table[variable=="sp_pNpS_driver",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=60, TeX( 'C. Driver gene, $pN/pS_{subclonal}$'))
+f5 <- pnps_table[variable=="sp_pNpS_neutral",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2,  TeX( 'A. Neutral gene, $pN/pS_{subclonal}$'))
+f6 <- pnps_table[variable=="sp_pNpS_deleterious",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX( 'B. Deleterious gene, $pN/pS_{subclonal}$'))
+f7 <- pnps_table[variable=="cl_pNpS_driver",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=60, TeX( 'F. Driver gene, $pN/pS_{clonal}$'))
+f8 <- pnps_table[variable=="cl_pNpS_neutral",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX( 'D. Neutral gene, $pN/pS_{clonal}$'))
+f9 <- pnps_table[variable=="cl_pNpS_deleterious",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX( 'E. Deleterious gene, $pN/pS_{clonal}$'))
+f10 <- pnps_table[variable=="pNpS_mix",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=2, TeX( 'C. Mixed gene, $pN/pS_{all}$'))
+f11 <- pnps_table[variable=="sp_pNpS_mix",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=60, TeX( 'A. Mixed gene, $pN/pS_{subclonal}$'))
+f12 <- pnps_table[variable=="cl_pNpS_mix",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s_pos","s_neg")] %>% ind_plot(y1=0,y2=60, TeX( 'B. Mixed gene, $pN/pS_{clonal}$'))
+ggpubr::ggarrange(f5,f6, f4, f8,f9,f7,  f2,f3,f1, 
                   nrow = 3, ncol=3, common.legend = TRUE, heights = c(4,4,4)
                  )
 
-caption <- "Average pN/pS, considering all the mutations present in the tumor, for each of the three genes (driver, neutral and deletereous) in all the scenarios simulated for the different positive ($s^+$, color lines) and negative ($s^-$, x-axis) selection coefficient. A.B,C show the pN/pS calculated using all the simulations present in the tumot. D, E, F using only those mutations above the threshold frequency of 0.05. G, H, I use only the clonal mutations for the tumor, those present in all the cells.
-"
+
 ```
+
+```{r fig-mixedGene, fig.height=5, fig.width=15}
+ggpubr::ggarrange(f11,f12,f10, 
+                  nrow = 1, ncol=3, common.legend = TRUE, heights = c(4,4,4)
+                 )
+```
+
 
 ## VAF
 
@@ -164,8 +162,8 @@ freqs <- lapply(files2, read_csv, col_names=FALSE) %>% bind_rows()
 q <- freqs[1:100,1:3000] %>% as.matrix %>% as.numeric
 nq <- 100
 tFreqs <- data.frame(q=q, 
-                      gene=factor(c(rep("driver",nq*1000),rep("deletereous",nq*1000),rep("neutral",nq*1000)), 
-                                 levels = c("driver","neutral","deletereous")),
+                      gene=factor(c(rep("driver",nq*1000),rep("deleterious",nq*1000),rep("neutral",nq*1000)), 
+                                 levels = c("neutral","deleterious","driver")),
                       mutation=factor(c(rep("N",nq*500),rep("S",nq*500),rep("N",nq*500),rep("S",nq*500),rep("N",nq*500),rep("S",nq*500)), 
                                  levels = c("N","S")))
 ```
@@ -183,7 +181,7 @@ examplePNPS <- as.data.table(tFreqs)[q>0,.N, by=c("gene","mutation")] %>%
                              dcast(gene ~ mutation) %>% 
                              mutate(pNpSclon=N/S) %>% 
                              select(gene,pNpSclon) ) 
-examplePNPS
+
 ```
 
 
@@ -199,69 +197,72 @@ tFreqs %>%
     facet_wrap(~gene) +
   
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=30000, fill=NULL, 
-              label=TeX('$pN/pS_{\\lbrack 0,1\\rbrack}$ = ', output = "character")),
+              label=TeX('$\\textit{pN/pS_{all}}$ = ', output = "character")),
               vjust = 1, hjust=1, size=5, parse=T) +
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=30000, fill=NULL, 
               label=sprintf(" %.02f",pNpSall)),
               vjust = 1, hjust=0, size=5, parse=T) +
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=26000, fill=NULL, 
-              label=TeX('$pN/pS_{\\lbrack 0.05,1\\rbrack}$ = ', output = "character")),
+              label=TeX('$\\textit{pN/pS_{subclonal}}$ = ', output = "character")),
               vjust = 1, hjust=1, size=5, parse=T) +
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=26000, fill=NULL, 
               label=sprintf(" %.02f",pNpSdet)),
               vjust = 1, hjust=0, size=5, parse=T) +
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=22000, fill=NULL, 
-              label=TeX('$pN/pS_{\\lbrack 1,1\\rbrack}$ = ', output = "character")),
+              label=TeX('$\\textit{pN/pS_{clonal}}$ = ', output = "character")),
               vjust = 1, hjust=1, size=5, parse=T) +
   geom_text(data = examplePNPS, mapping = aes(x=0.8, y=22000, fill=NULL, 
               label=sprintf(" %.02f",pNpSclon)),
               vjust = 1, hjust=0, size=5, parse=T) +
   
-    labs(x="Frequency", y="ocurrences in cohort", color="mutation type", title=latex2exp::latex2exp("$s^+ = 0.1$, $s^- = -0.25$, 1 cohort 100 tumors")) +
+    labs(x="Frequency", y="ocurrences in cohort", color="mutation type", title=latex2exp::latex2exp("$\\textit{s^+} = 0.1$, $\\textit{s^-} = -0.25$, 1 cohort 100 tumors")) +
     ggpubr::theme_pubr(base_size = 18) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 caption <- "Variant allele in a cohort of 1000 tumors for the $s^+$ = 0.1 and $s^-$ = -0.25 scenario."
 ```
 
 ## Relationship between selection coefficient and pN/pS
-
-
 ```{r}
+cohort_size <- 100
 freqs <- fread(here::here("results","s_freqs_merged.csv"))
 #Limit to 3000 replicates,as some cases could have a couple more of them 
 freqs <- freqs[, head(.SD,3000), by=V1002]
 colnames(freqs) <- c("s", rep("N",500), rep("S",500),"id", rep("kk",4))
-freqs <- data.table::melt(freqs, id.vars = "s", measure.vars = 2:1001, variable.name = "mutation", value.name = "q")
+freqs[, rep := 1:.N, by="s"]
+freqs[,cohort := ceiling(rep/cohort_size)]
+freqs <- data.table::melt(freqs, id.vars = c("s","cohort"), measure.vars = 2:1001, variable.name = "mutation", value.name = "q")
+
 ```
 
 ```{r}
-t_pNpS_s <- freqs[(s>-1),.(m0=sum(q>0),m01=sum(q>=0.001),m5=sum(q>=0.05),m100=sum(q==1)),by=.(s,mutation)] %>% 
-  dcast(s~mutation, value.var=c("m0","m01","m5","m100")) %>%
+t_pNpS_s <- freqs[(s>-1),.(m0=sum(q>0),m01=sum(q>=0.001),m5=sum(q>=0.05),m100=sum(q==1)),by=.(s,mutation,cohort)] %>% 
+  dcast(s+cohort~mutation, value.var=c("m0","m01","m5","m100")) %>%
   .[,.(s, pNpS_0 = m0_N/m0_S, pNpS_0.001 = m01_N/m01_S, pNpS_0.05 = m5_N/m5_S, pNpS_1 = m100_N/m100_S)] %>%
   data.table::melt(id.vars = "s", measure = patterns("^pNpS_"), variable.name="mutations", value.name="pN_pS") 
-setattr(t_pNpS_s[["mutations"]],"levels",c("all", "q >= 0.001", "q >= 0.05", "clonal(q = 1)"))
+setattr(t_pNpS_s[["mutations"]],"levels",c("all", "subclonal0.001", "subclonal0.05", "clonal"))
 ```
 
-
-```{r fig.height=6, fig.width=12}
- p3 <- t_pNpS_s %>% 
-  filter(mutations!="q >= 0.001") %>%
-  ggplot(aes(x=s, y=pN_pS, color=mutations))+
-  
-    #geom_smooth(method = "loess", lwd=2, se=FALSE)+
-    geom_line(lwd=1.2) +
-    geom_point() +
-     ggpubr::theme_pubr(base_size=20)+
-  
-    geom_hline(yintercept = 1, lty="dashed") +
+```{r fig-selection-log, fig.height=6, fig.width=10}
+t_pNpS_s[,.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","mutations")] %>% 
+  ggplot(aes(x=s, color=as.factor(mutations)))+
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.02) +
+    ggsci::scale_color_nejm() +
+    ggpubr::theme_pubr(base_size=16)+
     geom_vline(xintercept = 0, lty="dashed") +
-    ggsci::scale_color_aaas(name = "", labels = unname(TeX(c("$pN/pS_{\\[0,1\\]}$", 
-                                               "$pN/pS_{\\[0.05,1\\]}$",
-                                               "$pN/pS_{\\[1,1\\]"))))+
-  #ggsci::scale_color_nejm() +
-    labs(x="s", y="pN/pS") +
-    xlim(c(-1,2)) 
+    labs(y="pN/pS", x=TeX("s"), color="      mutations")+
+  scale_y_continuous(trans='log10') +
+    #coord_trans(y="log10")+
+    geom_hline(yintercept = 1, lty="dashed") +
+    #ylim(c(-1,10)) +
+    theme(plot.title = element_text(face = "bold", size=14))
 ```
+
+```{r}
+t_pNpS_s[mutations=="all" & s>=0, .(pnps=mean(pN_pS)), by="s"]
+t_pNpS_s[mutations=="all" & s>=0.05,] %>% lm(pN_pS~s,data = .) %>% summary()
+```
+
 
 
 ```{r}
@@ -275,7 +276,7 @@ p1<-freqs[q>0 & (s==-0.75 | s==-0.05 | s==0 | s==0.05 |  s==0.75 | s== 2)] %>%
     ggpubr::theme_pubr(base_size = 20) +
     facet_grid(s ~., scales = "free_y", labeller = labeller(s = facet.labs)) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-    labs(subtitle="Frequencies [0,1]", x="Frequency")
+    labs(subtitle="All", x="Frequency")
 p2<-freqs[q>0.05 & (s==-0.75 | s==-0.05 | s==0 | s==0.05 | s==0.75 | s== 2)] %>% 
     ggplot(aes(x=q, fill=mutation)) + 
     geom_bar(position = "stack") +
@@ -284,14 +285,11 @@ p2<-freqs[q>0.05 & (s==-0.75 | s==-0.05 | s==0 | s==0.05 | s==0.75 | s== 2)] %>%
     ggpubr::theme_pubr(base_size = 20) +
     facet_grid(s ~., scales = "free_y", labeller = labeller(s = facet.labs)) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-    labs(subtitle="Frequencies [0.05,1]", x="Frequency")
-pmuts <- ggpubr::ggarrange(p1,p2, common.legend = TRUE, legend = "top" )
+    labs(subtitle="Subclonal", x="Frequency")
+ggpubr::ggarrange(p1,p2, common.legend = TRUE, legend = "top" )
 ```
 
-```{r fig-selection, fig.height=25, fig.width=12, fig.cap=caption}
-caption <- "A. Relationship between selection coefficient (s) and pN/pS using different kinds of mutations defined by their frequency in the whole tumor. B. Distribution of the mutation frequencies when considering all the mutations in the tumor or just those present in at least 5% of the cells. Different row panels show different selection coefficient for the non-synomous (N) mutations."
-ggpubr::ggarrange(p3, pmuts, nrow = 2,heights = c(5,16),labels = c("A","B")) 
-```
+
 
 
 
@@ -394,94 +392,93 @@ all <- wdt[,.(s, cohort, rep, threshold_size, true_size, time, rel_time, Nmuts= 
 
 ```
 
+
+
+
 ```{r}
-panA <- all %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panI <- all[,.(mean=mean(Nmuts),se=2*sd(Nmuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{A.} $N_{\\lbrack 0,1\\rbrack}$")) +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{I.} All non-synonymous")) +
     theme(plot.title = element_text(face = "bold", size=14))
   
-panB <- all %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panH <- all[,.(mean=mean(Smuts),se=2*sd(Smuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none", ) +
-    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{B.} $S_{\\lbrack 0,1\\rbrack}$"))  +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{H.} All synonymous"))  +
     theme(plot.title = element_text(face = "bold", size=14))
 
-panC <- all %>%
-  ggplot(aes(x=as.factor(threshold_size), y=pNpS, fill=as.factor(s))) + 
-    # geom_point(size=0.5,alpha=0.5) +
-     stat_boxplot(outlier.size=1, outlier.color = NA, outlier.shape = 21) +
-    ggsci::scale_fill_nejm() +
+panG <- all[,.(mean=mean(pNpS),se=2*sd(pNpS)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
+    ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="pN/pS", x=TeX("log_{10}(cells)"), fill="      s", title= TeX("\\textbf{C.} $pN/pS_{\\lbrack 0,1\\rbrack}$"))  +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{G.} $pN/pS_{all}$"))  +
     geom_hline(yintercept = 1, lty="dashed") +
     ylim(c(0,50)) +
     theme(plot.title = element_text(face = "bold", size=14))
 
-panD <- segregating %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panC <- segregating[,.(mean=mean(Nmuts),se=2*sd(Nmuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{D.} $N_{\\lbrack 0.05,1\\rbrack}$"))  +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{C.} Subclonal non-synonymous"))  +
     theme(plot.title = element_text(face = "bold", size=14))
   
-panE <- segregating %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panB <- segregating[,.(mean=mean(Smuts),se=2*sd(Smuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{E.} $S_{\\lbrack 0.05,1\\rbrack}$")) +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{B.} Subclonal synonymous$")) +
     theme(plot.title = element_text(face = "bold", size=14))
 
-panF <- segregating %>%
-  ggplot(aes(x=as.factor(threshold_size), y=pNpS, fill=as.factor(s))) + 
-     stat_boxplot(outlier.size=1, outlier.color = NA, outlier.shape = 21) +
-    ggsci::scale_fill_nejm() +
+panA <- segregating[,.(mean=mean(pNpS),se=2*sd(pNpS)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
+    ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="pN/pS", x=TeX("log_{10}(cells)"), fill="      s", title= TeX("\\textbf{F.} $pN/pS_{\\lbrack 0.05,1\\rbrack}$")) +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{A.} $pN/pS_{subclonal}$")) +
     geom_hline(yintercept = 1, lty="dashed") +
     ylim(c(0,100)) +
     theme(plot.title = element_text(face = "bold", size=14))
 
-panG <- clonal %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Nmuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panF <- clonal[,.(mean=mean(Nmuts),se=2*sd(Nmuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size,  color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{G.} $N_{\\lbrack 1,1\\rbrack}$")) +
+    labs(y="N", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{F.} Clonal non-synonymous")) +
     theme(plot.title = element_text(face = "bold", size=14))
   
-panH <- clonal %>%
-  ggplot(aes(x=as.factor(threshold_size), y=Smuts, color=as.factor(s))) + 
-     geom_point(size=0.5,alpha=0.5) +
-    stat_summary(fun.y=mean, geom = "line", aes(group=as.factor(s)),size=0.8) +
-    stat_summary(fun.y=mean, geom = "point", aes(group=as.factor(s)), size=1) +
+panE <- clonal[,.(mean=mean(Smuts),se=2*sd(Smuts)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size, color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
     ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{H.} $S_{\\lbrack 1,1\\rbrack}$")) +
+    labs(y="S", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{E.} Clonal synonymous")) +
     theme(plot.title = element_text(face = "bold", size=14))
 
-panI <- clonal %>%
-  ggplot(aes(x=as.factor(threshold_size), y=pNpS, fill=as.factor(s))) + 
-     stat_boxplot(outlier.size=1, outlier.color = NA, outlier.shape = 21) +
-    ggsci::scale_fill_nejm() +
+panD <- clonal[,.(mean=mean(pNpS),se=2*sd(pNpS)/sqrt(.N)),by=c("s","threshold_size")] %>%
+  ggplot(aes(x=threshold_size, color=as.factor(s))) + 
+    geom_line(aes(y=mean)) +
+    geom_errorbar(aes(ymin=mean-se,ymax=mean+se), width=0.1) +
+    ggsci::scale_color_nejm() +
     ggpubr::theme_pubr(base_size=16, legend = "none") +
-    labs(y="pN/pS", x=TeX("log_{10}(cells)"), fill="      s", title= TeX("\\textbf{I.} $pN/pS_{\\lbrack 1,1\\rbrack}$")) +
+    labs(y="pN/pS", x=TeX("log_{10}(cells)"), color="      s", title= TeX("\\textbf{D.} $pN/pS_{clonal}$")) +
     geom_hline(yintercept = 1, lty="dashed") +
     ylim(c(0,50)) +
     theme(plot.title = element_text(face = "bold", size=14))
@@ -490,43 +487,186 @@ panI <- clonal %>%
 
 ```
 
-```{r fig-time, fig.height=13, fig.width=12}
 
-ggpubr::ggarrange(panA,panB,panC,panD,panE,panF,panG,panH,panI, ncol=3, nrow=3, widths = c(2,2,6), common.legend = T,align = "hv")
+```{r fig-time-lines, fig.height=13, fig.width=12}
+
+ggpubr::ggarrange(panA,panB,panC,panD,panE,panF,panG,panH,panI, ncol=3, nrow=3, widths = c(2,2,2), common.legend = T,align = "hv")
 ```
 
-# McDonald-Kreitman
+
+
+# Supplementary figures
+
 
 ```{r}
-#clonal, replicate by replicate, then summarizing by cohort
-mutations_table <- wdt[,.(s, cohort, rep, threshold_size,  
-                          Npol= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0 & X<1)}), 
-                          Spol= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X>0 & X<1)}),
-                          Nfix= apply(wdt[,which(grepl("^N.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}), 
-                          Sfix= apply(wdt[,which(grepl("^S.*$", colnames(wdt))), with=FALSE], 1, function(X){sum(X==1)}))
-                       ][, .(Nfix = sum(Nfix), Sfix = sum(Sfix),Npol = sum(Npol), Spol = sum(Spol)), by = c("s","cohort","threshold_size")
-                        ][,pNpS := Npol/Spol
-                        ][,dNdS := Nfix/Sfix
-                        ][,alpha := 1-pNpS/dNdS
-                        ]
-mutations_table[,pvalue := apply(mutations_table[,.(Npol,Spol,Nfix,Sfix)],1,function(X) fisher.test(matrix(X,nr=2,byrow = T))$p.value)]
-
+plotVAF <- function(dt, ymax=30000) {
+  q <- dt[1:100, 1:3000] %>% as.matrix %>% as.numeric
+  spos <- dt[1,3002]
+  sneg <- dt[1,3003]
+  nq <- 100
+  tFreqs <- data.frame(
+    q = q,
+    gene = factor(
+      c(
+        rep("driver", nq * 1000),
+        rep("deleterious", nq * 1000),
+        rep("neutral", nq * 1000)
+      ),
+      levels = c("driver", "neutral", "deleterious")
+    ),
+    mutation = factor(c(
+      rep("N", nq * 500),
+      rep("S", nq * 500),
+      rep("N", nq * 500),
+      rep("S", nq * 500),
+      rep("N", nq * 500),
+      rep("S", nq * 500)
+    ),
+    levels = c("N", "S"))
+  )
+  examplePNPS <-
+    as.data.table(tFreqs)[q > 0, .N, by = c("gene", "mutation")] %>%
+    dcast(gene ~ mutation) %>%
+    mutate(pNpSall = N / S) %>%
+    select(gene, pNpSall) %>%
+    left_join(
+      as.data.table(tFreqs)[q > 0.05, .N, by = c("gene", "mutation")] %>%
+        dcast(gene ~ mutation) %>%
+        mutate(pNpSdet = N / S) %>%
+        select(gene, pNpSdet)
+    ) %>%
+    left_join(
+      as.data.table(tFreqs)[q == 1, .N, by = c("gene", "mutation")] %>%
+        dcast(gene ~ mutation) %>%
+        mutate(pNpSclon = N / S) %>%
+        select(gene, pNpSclon)
+    )
+  tFreqs %>%
+    filter(q > 0) %>%
+    ggplot(aes(x = q, fill = mutation)) +
+    geom_bar(position = "stack") +
+    scale_x_binned(breaks = seq(0.05,0.95, by = 0.05),
+                   labels = c(".05","",".15","",".25","",".35","",".45","",".55","",".65","",".75","",".85","",".95"))+
+    
+    facet_wrap( ~ gene) +
+    
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = ymax,
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{all}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = ymax,
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSall)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 5*(ymax/6),
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{subclonal}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 5*(ymax/6),
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSdet)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 4*(ymax/6),
+        fill = NULL,
+        label = latex2exp::TeX('$pN/pS_{clonal}$ = ', output = "character")
+      ),
+      vjust = 1,
+      hjust = 1,
+      size = 5,
+      parse = T
+    ) +
+    geom_text(
+      data = examplePNPS,
+      mapping = aes(
+        x = 0.8,
+        y = 4*(ymax/6),
+        fill = NULL,
+        label = sprintf(" %.02f", pNpSclon)
+      ),
+      vjust = 1,
+      hjust = 0,
+      size = 5,
+      parse = T
+    ) +
+    
+    labs(
+      x = "Frequency",
+      y = "ocurrences in cohort",
+      color = "mutation type",
+      title=latex2exp::TeX(paste0("$s^+ = ",spos,"$, $s^- = ",sneg,"$"))
+      
+    ) +
+    ggpubr::theme_pubr(base_size = 18) +
+    theme(axis.text.x = element_text(
+      angle = 45,
+      vjust = 1,
+      hjust = 1
+    ))
+}
 ```
 
-
-```{r fig-mcDonald, fig.height=6,fig.width=10, dev=c('png','pdf')}
-mutations_table %>%
-  ggplot(aes(x=as.factor(threshold_size), y=alpha, fill=as.factor(s))) + 
-     stat_boxplot(outlier.size=1, outlier.color = NA, outlier.shape = 21) +
-    ggsci::scale_fill_nejm() +
-    ggpubr::theme_pubr(base_size=20) +
-    labs(y=expression(alpha), x=latex2exp::TeX("log_{10}(cells)"), fill="      s")  +
-    geom_hline(yintercept = 1, lty="dashed") +
-    geom_hline(yintercept = 0, lty="dashed") +
-    ylim(c(-15,1)) +
-    theme(plot.title = element_text(face = "bold", size=14))
-
+```{r fig-supp1, warning=F, fig.width=14, fig.height=20}
+#s_pos = 0.1
+freq_files <- c(here::here("results/McF_30.freqs.csv"),here::here("results/McF_31.freqs.csv"),here::here("results/McF_32.freqs.csv"),here::here("results/McF_34.freqs.csv"),here::here("results/McF_33.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF(ymax=30000)}), common.legend = TRUE, legend = "top", ncol = 1 )
 ```
 
+```{r fig-supp2, warning=F, fig.width=14, fig.height=20}
+#s_pos = 0.5
+freq_files <- c(here::here("results/McF_10.freqs.csv"),here::here("results/McF_11.freqs.csv"),here::here("results/McF_12.freqs.csv"),here::here("results/McF_14.freqs.csv"),here::here("results/McF_13.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF(ymax=18000)}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
+
+```{r fig-supp3, warning=F, fig.width=14, fig.height=20}
+#s_pos = 1
+freq_files <- c(here::here("results/McF_20.freqs.csv"),here::here("results/McF_21.freqs.csv"),here::here("results/McF_22.freqs.csv"),here::here("results/McF_24.freqs.csv"),here::here("results/McF_23.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF(ymax = 16000)}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
+
+```{r fig-supp4, warning=F, fig.width=14, fig.height=20}
+#s_pos = 2
+freq_files <- c(here::here("results/McF_40.freqs.csv"),here::here("results/McF_41.freqs.csv"),here::here("results/McF_42.freqs.csv"),here::here("results/McF_44.freqs.csv"),here::here("results/McF_43.freqs.csv"))
+ggpubr::ggarrange(plotlist = lapply(freq_files,function(X){read_csv(X,col_names = F) %>% plotVAF(ymax = 16000)}), common.legend = TRUE, legend = "top", ncol = 1 )
+```
 
 
