@@ -15,3 +15,6 @@ OncoSimulR, tidyverse, here
 - scripts: Source code for the scripts used to run different cases
 - reports: source code and rendered documents for the reports generated
 - man: documentation
+
+
+*This work was supported by the European Research Council (grant ERC-617457), Spanish Ministry of Economy and Competitiveness (grant BFU2015-63774-P) and Xunta de Galicia.*
