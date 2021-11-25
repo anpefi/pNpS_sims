@@ -93,8 +93,8 @@ gene_drv <-
          rep(0,nNS_gene-floor(nNS_gene*prop_eff)),
          rep(0,nS_gene) ), n_pos)
 gene_neg <-
-  rep(c( rep(s_neg,floor(nNS_gene*prop_eff)),
-         rep(0,nNS_gene-floor(nNS_gene*prop_eff)),
+  rep(c( rep(s_neg,floor(nNS_gene*0.5)),    # This version fixes the proportion of negative sites with effect to the 50%
+         rep(0,nNS_gene-floor(nNS_gene*0.5)),
          rep(0,nS_gene) ), n_neg)
 gene_neu <-
   rep(c( rep(0,nNS_gene), rep(0,nS_gene) ), n_neu)
