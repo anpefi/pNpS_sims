@@ -268,7 +268,7 @@ dnds_table <- dnds_list %>% lapply('[[',2) %>% rbindlist()
 ```{r}
 t_pNpS_s <- dnds_table %>%
   data.table::melt(id.vars = c("s","t"), measure = patterns("^ns_"), variable.name="mutations", value.name="pN_pS") 
-setattr(t_pNpS_s[["mutations"]],"levels",c("dN/dS0.001", "dN/dS0.05", "dN/dSCLONAL"))
+setattr(t_pNpS_s[["mutations"]],"levels",c("dN/dS0.01", "dN/dS0.05", "dN/dSCLONAL"))
 ```
 
 ```{r fig-3, fig.height=6, fig.width=10}
@@ -319,7 +319,7 @@ vaf_table[order(s, type, t, -q), cumdist := cumsum(count), by=c("s","type", "t")
 
 
 ```{r fig-5, fig.height=5, fig.width=12}
-lbls <- list(TeX('$\\textit{dN/dS}_{0.001}$'), TeX('$\\textit{dN/dS}_{0.05}$'), TeX('$\\textit{dN/dS}_{0.95}$'))
+lbls <- list(TeX('$\\textit{dN/dS}_{0.01}$'), TeX('$\\textit{dN/dS}_{0.05}$'), TeX('$\\textit{dN/dS}_{0.95}$'))
 
 make_plotmath_labels <- function(labs){
   labs <- str_replace_all(labs, " ", "*")
@@ -339,8 +339,8 @@ t_levels <- c("10^2 cells","10^3 cells","10^4 cells","10^5 cells")
   NULL
   }
 
- p1 <- t_pNpS_s[s>0 & mutations=="dN/dS0.001",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
-   t_plot_ind(tit=TeX('A. $\\textit{dN/dS}_{0.001}$'))
+ p1 <- t_pNpS_s[s>0 & mutations=="dN/dS0.01",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
+   t_plot_ind(tit=TeX('A. $\\textit{dN/dS}_{0.01}$'))
   p2 <- t_pNpS_s[s>0 & mutations=="dN/dS0.05",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
    t_plot_ind(tit=TeX('B. $\\textit{dN/dS}_{0.05}$'))
    p3 <- t_pNpS_s[s>0 & mutations=="dN/dSCLONAL",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
