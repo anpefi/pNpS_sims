@@ -319,7 +319,7 @@ vaf_table[order(s, type, t, -q), cumdist := cumsum(count), by=c("s","type", "t")
 
 
 ```{r fig-5, fig.height=5, fig.width=12}
-lbls <- list(TeX('$\\textit{dN/dS}_{0.001}$'), TeX('$\\textit{dN/dS}_{0.05}$'), TeX('$\\textit{dN/dS}_{0.95}$'))
+lbls <- list(TeX('$\\textit{dN/dS}_{0.01}$'), TeX('$\\textit{dN/dS}_{0.05}$'), TeX('$\\textit{dN/dS}_{0.95}$'))
 
 make_plotmath_labels <- function(labs){
   labs <- str_replace_all(labs, " ", "*")
