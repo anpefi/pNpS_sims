@@ -159,9 +159,9 @@ single_dist_plot <- function(dt, threshold=0.01){
       coord_cartesian( ylim=c(1,1500))+
       scale_y_log10() +
     scale_x_log10() +
-      geom_vline(xintercept = 0.01, lty="dashed", color="gray50", alpha=0.7) +
-      geom_vline(xintercept = 0.05, lty="dashed", color="gray50", alpha=0.7) +
-      geom_vline(xintercept = 0.95, lty="dashed", color="gray50", alpha=0.7) +
+      #geom_vline(xintercept = 0.01, lty="dashed", color="gray50", alpha=0.7) +
+      #geom_vline(xintercept = 0.05, lty="dashed", color="gray50", alpha=0.7) +
+      #geom_vline(xintercept = 0.95, lty="dashed", color="gray50", alpha=0.7) +
       lemon::facet_rep_grid(s_pos_exp ~ gene_exp, labeller = labeller(s_pos_exp=label_parsed), scales='free')+
       #ggpubr::theme_pubr(base_size = 14) +
      # geom_text(aes(x=0.5,y=Inf, label=paste(s_pos," ",s_neg, "   gene:",gene)), vjust=1) +
@@ -255,7 +255,7 @@ dnds_table <- dnds_list %>% lapply('[[',2) %>% rbindlist()
 ``` r
 t_pNpS_s <- dnds_table %>%
   data.table::melt(id.vars = c("s","t"), measure = patterns("^ns_"), variable.name="mutations", value.name="pN_pS") 
-setattr(t_pNpS_s[["mutations"]],"levels",c("dN/dS0.001", "dN/dS0.05", "dN/dSCLONAL"))
+setattr(t_pNpS_s[["mutations"]],"levels",c("dN/dS0.01", "dN/dS0.05", "dN/dSCLONAL"))
 ```
 
 ``` r
@@ -283,9 +283,9 @@ vaf_table[order(s, type, t, -q), cumdist := cumsum(count), by=c("s","type", "t")
     coord_cartesian( ylim=c(0.1,5000))+
     scale_y_log10(labels = function(x) sprintf("%g", x)) +
     scale_x_log10() +
-    geom_vline(xintercept = 0.01, lty="dashed", color="gray50", alpha=0.7) +
-    geom_vline(xintercept = 0.05, lty="dashed", color="gray50", alpha=0.7) +
-    geom_vline(xintercept = 0.95, lty="dashed", color="gray50", alpha=0.7) +
+    #geom_vline(xintercept = 0.01, lty="dashed", color="gray50", alpha=0.7) +
+    #geom_vline(xintercept = 0.05, lty="dashed", color="gray50", alpha=0.7) +
+    #geom_vline(xintercept = 0.95, lty="dashed", color="gray50", alpha=0.7) +
     lemon::facet_rep_grid(s ~ t, labeller = label_bquote(cols= 10^.(t)~ "cells", rows = "s = "*.(s)), scales='free')+
     ggpubr::theme_pubr(base_size = 16) +
     theme(legend.text = element_text(face = "italic")) +
@@ -319,8 +319,8 @@ t_levels <- c("10^2 cells","10^3 cells","10^4 cells","10^5 cells")
   NULL
   }
 
- p1 <- t_pNpS_s[s>0 & mutations=="dN/dS0.001",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
-   t_plot_ind(tit=TeX('A. $\\textit{dN/dS}_{0.001}$'))
+ p1 <- t_pNpS_s[s>0 & mutations=="dN/dS0.01",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
+   t_plot_ind(tit=TeX('A. $\\textit{dN/dS}_{0.01}$'))
   p2 <- t_pNpS_s[s>0 & mutations=="dN/dS0.05",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
    t_plot_ind(tit=TeX('B. $\\textit{dN/dS}_{0.05}$'))
    p3 <- t_pNpS_s[s>0 & mutations=="dN/dSCLONAL",.(mean=mean(pN_pS, na.rm = T),se=2*sd(pN_pS, na.rm = T)/sqrt(.N)),by=c("s","t","mutations")] %>% 
